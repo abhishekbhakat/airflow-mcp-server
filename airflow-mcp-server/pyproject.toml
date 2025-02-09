@@ -16,6 +16,7 @@ airflow-mcp-server = "airflow_mcp_server.__main__:main"
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.2.2",
     "pre-commit>=4.0.1",
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.0",
