@@ -6,4 +6,5 @@ logs/
 .venv
 airflow.db
 airflow.cfg
-airflow-mcp-server
+airflow-mcp-server/
+resources/
