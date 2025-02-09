@@ -1,10 +1,19 @@
 from abc import ABC, abstractmethod
+from typing import Any
 
 class BaseTools(ABC):
-
-    def __init__(self):
+    """Abstract base class for tools."""
+    
+    @abstractmethod
+    def __init__(self) -> None:
+        """Initialize the tool."""
         pass
 
     @abstractmethod
-    def run(self):
-        pass
+    def run(self) -> Any:
+        """Execute the tool's main functionality.
+        
+        Returns:
+            Any: The result of the tool execution
+        """
+        raise NotImplementedError
