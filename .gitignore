@@ -173,3 +173,6 @@ cython_debug/
 
 # Local Resources
 resources/
+._*.py
+._.repo_ignore
+.repo_ignore
