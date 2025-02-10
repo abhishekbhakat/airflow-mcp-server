@@ -8,10 +8,10 @@ from airflow_mcp_server.server import serve
 
 
 @click.command()
-@click.option("--working-dir", "-w", type=Path, help="Working directory path")
+@click.option("-y", "--yaml-spec", type=Path, help="YAML spec file")
 @click.option("-v", "--verbose", count=True)
-def main(working_dir: Path | None, verbose: bool) -> None:
-    """MCP Code Assist Server - Code operations for MCP"""
+def main(yaml_spec: Path | None, verbose: bool) -> None:
+    """MCP server for Airflow"""
     import asyncio
 
     logging_level = logging.WARN
@@ -21,7 +21,7 @@ def main(working_dir: Path | None, verbose: bool) -> None:
         logging_level = logging.DEBUG
 
     logging.basicConfig(level=logging_level, stream=sys.stderr)
-    asyncio.run(serve(working_dir))
+    asyncio.run(serve(yaml_spec))
 
 
 if __name__ == "__main__":
