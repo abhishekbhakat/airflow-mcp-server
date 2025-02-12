@@ -25,25 +25,39 @@ class OperationDetails:
 class OperationParser:
     """Parser for OpenAPI operations."""
 
-    def __init__(self, spec_path: Path | str | object) -> None:
+    def __init__(self, spec_path: Path | str | dict | bytes | object) -> None:
         """Initialize parser with OpenAPI specification.
 
         Args:
-            spec_path: Path to OpenAPI spec file or file-like object
-        """
-        # Load and parse OpenAPI spec
-        if isinstance(spec_path, (str | Path)):
-            with open(spec_path) as f:
-                self.raw_spec = yaml.safe_load(f)
-        else:
-            self.raw_spec = yaml.safe_load(spec_path)
+            spec_path: Path to OpenAPI spec file, dict, bytes, or file-like object
 
-        # Initialize OpenAPI spec
-        spec = OpenAPI.from_dict(self.raw_spec)
-        self.spec = spec
-        self._paths = self.raw_spec["paths"]
-        self._components = self.raw_spec.get("components", {})
-        self._schema_cache: dict[str, dict[str, Any]] = {}
+        Raises:
+            ValueError: If spec_path is invalid or spec cannot be loaded
+        """
+        try:
+            # Load and parse OpenAPI spec
+            if isinstance(spec_path, bytes):
+                self.raw_spec = yaml.safe_load(spec_path)
+            elif isinstance(spec_path, dict):
+                self.raw_spec = spec_path
+            elif isinstance(spec_path, str | Path):
+                with open(spec_path) as f:
+                    self.raw_spec = yaml.safe_load(f)
+            elif hasattr(spec_path, "read"):
+                self.raw_spec = yaml.safe_load(spec_path)
+            else:
+                raise ValueError(f"Invalid spec_path type: {type(spec_path)}. Expected Path, str, dict, bytes or file-like object")
+
+            # Initialize OpenAPI spec
+            spec = OpenAPI.from_dict(self.raw_spec)
+            self.spec = spec
+            self._paths = self.raw_spec["paths"]
+            self._components = self.raw_spec.get("components", {})
+            self._schema_cache: dict[str, dict[str, Any]] = {}
+
+        except Exception as e:
+            logger.error("Error initializing OperationParser: %s", e)
+            raise ValueError(f"Failed to initialize parser: {e}") from e
 
     def parse_operation(self, operation_id: str) -> OperationDetails:
         """Parse operation details from OpenAPI spec.

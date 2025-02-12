@@ -2,7 +2,7 @@ import logging
 import re
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, BinaryIO, TextIO
 
 import aiohttp
 import yaml
@@ -30,20 +30,39 @@ class AirflowClient:
 
     def __init__(
         self,
-        spec_path: Path | str | object,
+        spec_path: Path | str | dict | bytes | BinaryIO | TextIO,
         base_url: str,
         auth_token: str,
     ) -> None:
-        """Initialize Airflow client."""
-        # Load and parse OpenAPI spec
-        if isinstance(spec_path, (str | Path)):
-            with open(spec_path) as f:
-                self.raw_spec = yaml.safe_load(f)
-        else:
-            self.raw_spec = yaml.safe_load(spec_path)
+        """Initialize Airflow client.
 
-        # Initialize OpenAPI spec
+        Args:
+            spec_path: OpenAPI spec as file path, dict, bytes, or file object
+            base_url: Base URL for API
+            auth_token: Authentication token
+
+        Raises:
+            ValueError: If spec_path is invalid or spec cannot be loaded
+        """
         try:
+            # Load and parse OpenAPI spec
+            if isinstance(spec_path, dict):
+                self.raw_spec = spec_path
+            elif isinstance(spec_path, bytes):
+                self.raw_spec = yaml.safe_load(spec_path)
+            elif isinstance(spec_path, str | Path):
+                with open(spec_path) as f:
+                    self.raw_spec = yaml.safe_load(f)
+            elif hasattr(spec_path, "read"):
+                content = spec_path.read()
+                if isinstance(content, bytes):
+                    self.raw_spec = yaml.safe_load(content)
+                else:
+                    self.raw_spec = yaml.safe_load(content)
+            else:
+                raise ValueError("Invalid spec_path type. Expected Path, str, dict, bytes or file-like object")
+
+            # Initialize OpenAPI spec
             self.spec = OpenAPI.from_dict(self.raw_spec)
             logger.debug("OpenAPI spec loaded successfully")
 
@@ -51,26 +70,22 @@ class AirflowClient:
             logger.debug("Raw spec keys: %s", self.raw_spec.keys())
 
             # Get paths from raw spec
-            if "paths" in self.raw_spec:
-                self._paths = self.raw_spec["paths"]
-                logger.debug("Using raw spec paths")
-            else:
+            if "paths" not in self.raw_spec:
                 raise ValueError("OpenAPI spec does not contain paths information")
+            self._paths = self.raw_spec["paths"]
+            logger.debug("Using raw spec paths")
+
+            # API configuration
+            self.base_url = base_url.rstrip("/")
+            self.headers = {
+                "Authorization": f"Bearer {auth_token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
 
         except Exception as e:
-            logger.error("Failed to initialize OpenAPI spec: %s", e)
+            logger.error("Failed to initialize AirflowClient: %s", e)
             raise
-
-        # API configuration
-        self.base_url = base_url.rstrip("/")
-        self.headers = {
-            "Authorization": f"Bearer {auth_token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-
-        # Session management
-        self._session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self) -> "AirflowClient":
         """Enter async context, creating session."""
@@ -81,7 +96,7 @@ class AirflowClient:
         """Exit async context, closing session."""
         if self._session:
             await self._session.close()
-            self._session = None
+            delattr(self, "_session")
 
     def _get_operation(self, operation_id: str) -> tuple[str, str, SimpleNamespace]:
         """Get operation details from OpenAPI spec.
@@ -140,9 +155,10 @@ class AirflowClient:
 
         Raises:
             ValueError: If operation not found
+            RuntimeError: If used outside async context
             aiohttp.ClientError: For HTTP/network errors
         """
-        if not self._session:
+        if not hasattr(self, "_session") or not self._session:
             raise RuntimeError("Client not in async context")
 
         try:
