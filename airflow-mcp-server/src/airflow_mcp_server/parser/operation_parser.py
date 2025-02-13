@@ -18,7 +18,7 @@ class OperationDetails:
     path: str
     method: str
     parameters: dict[str, Any]
-    request_body: type[BaseModel] | None = None
+    input_model: type[BaseModel]
     response_model: type[BaseModel] | None = None
 
 
@@ -35,7 +35,6 @@ class OperationParser:
             ValueError: If spec_path is invalid or spec cannot be loaded
         """
         try:
-            # Load and parse OpenAPI spec
             if isinstance(spec_path, bytes):
                 self.raw_spec = yaml.safe_load(spec_path)
             elif isinstance(spec_path, dict):
@@ -48,7 +47,6 @@ class OperationParser:
             else:
                 raise ValueError(f"Invalid spec_path type: {type(spec_path)}. Expected Path, str, dict, bytes or file-like object")
 
-            # Initialize OpenAPI spec
             spec = OpenAPI.from_dict(self.raw_spec)
             self.spec = spec
             self._paths = self.raw_spec["paths"]
@@ -72,7 +70,6 @@ class OperationParser:
             ValueError: If operation not found or invalid
         """
         try:
-            # Find operation in spec
             for path, path_item in self._paths.items():
                 for method, operation in path_item.items():
                     if method.startswith("x-") or method == "parameters":
@@ -81,21 +78,30 @@ class OperationParser:
                     if operation.get("operationId") == operation_id:
                         logger.debug("Found operation %s at %s %s", operation_id, method, path)
 
-                        # Add path to operation for parameter context
                         operation["path"] = path
                         operation["path_item"] = path_item
 
-                        # Extract operation details
                         parameters = self.extract_parameters(operation)
-                        request_body = self._parse_request_body(operation)
                         response_model = self._parse_response_model(operation)
+
+                        # Get request body schema if present
+                        body_schema = None
+                        if "requestBody" in operation:
+                            content = operation["requestBody"].get("content", {})
+                            if "application/json" in content:
+                                body_schema = content["application/json"].get("schema", {})
+                                if "$ref" in body_schema:
+                                    body_schema = self._resolve_ref(body_schema["$ref"])
+
+                        # Create unified input model
+                        input_model = self._create_input_model(operation_id, parameters, body_schema)
 
                         return OperationDetails(
                             operation_id=operation_id,
                             path=str(path),
                             method=method,
                             parameters=parameters,
-                            request_body=request_body,
+                            input_model=input_model,
                             response_model=response_model,
                         )
 
@@ -104,6 +110,37 @@ class OperationParser:
         except Exception as e:
             logger.error("Error parsing operation %s: %s", operation_id, e)
             raise
+
+    def _create_input_model(
+        self,
+        operation_id: str,
+        parameters: dict[str, Any],
+        body_schema: dict[str, Any] | None = None,
+    ) -> type[BaseModel]:
+        """Create unified input model for all parameters."""
+        fields: dict[str, tuple[type, Any]] = {}
+
+        # Add path parameters
+        for name, schema in parameters.get("path", {}).items():
+            field_type = schema["type"]
+            required = schema.get("required", True)  # Path parameters are required by default
+            fields[f"path_{name}"] = (field_type, ... if required else None)
+
+        # Add query parameters
+        for name, schema in parameters.get("query", {}).items():
+            field_type = schema["type"]
+            required = schema.get("required", False)  # Query parameters are optional by default
+            fields[f"query_{name}"] = (field_type, ... if required else None)
+
+        # Add body fields if present
+        if body_schema and body_schema.get("type") == "object":
+            for prop_name, prop_schema in body_schema.get("properties", {}).items():
+                field_type = self._map_type(prop_schema.get("type", "string"))
+                required = prop_name in body_schema.get("required", [])
+                fields[f"body_{prop_name}"] = (field_type, ... if required else None)
+
+        logger.debug("Creating input model for %s with fields: %s", operation_id, fields)
+        return create_model(f"{operation_id}_input", **fields)
 
     def extract_parameters(self, operation: dict[str, Any]) -> dict[str, Any]:
         """Extract and categorize operation parameters.
@@ -120,12 +157,10 @@ class OperationParser:
             "header": {},
         }
 
-        # Handle path-level parameters
         path_item = operation.get("path_item", {})
         if path_item and "parameters" in path_item:
             self._process_parameters(path_item["parameters"], parameters)
 
-        # Handle operation-level parameters
         self._process_parameters(operation.get("parameters", []), parameters)
 
         return parameters
@@ -138,11 +173,9 @@ class OperationParser:
             target: Target dictionary to store processed parameters
         """
         for param in params:
-            # Resolve parameter reference if needed
             if "$ref" in param:
                 param = self._resolve_ref(param["$ref"])
 
-            # Validate parameter structure
             if not isinstance(param, dict) or "in" not in param:
                 logger.warning("Invalid parameter format: %s", param)
                 continue
@@ -165,7 +198,7 @@ class OperationParser:
 
         parts = ref.split("/")
         current = self.raw_spec
-        for part in parts[1:]:  # Skip first '#'
+        for part in parts[1:]:
             current = current[part]
 
         self._schema_cache[ref] = current
@@ -192,14 +225,7 @@ class OperationParser:
         }
 
     def _map_type(self, openapi_type: str) -> type:
-        """Map OpenAPI type to Python type.
-
-        Args:
-            openapi_type: OpenAPI type string
-
-        Returns:
-            Corresponding Python type
-        """
+        """Map OpenAPI type to Python type."""
         type_map = {
             "string": str,
             "integer": int,
@@ -209,28 +235,6 @@ class OperationParser:
             "object": dict,
         }
         return type_map.get(openapi_type, Any)
-
-    def _parse_request_body(self, operation: dict[str, Any]) -> type[BaseModel] | None:
-        """Parse request body schema into Pydantic model.
-
-        Args:
-            operation: Operation object from OpenAPI spec
-
-        Returns:
-            Pydantic model for request body or None
-        """
-        if "requestBody" not in operation:
-            return None
-
-        content = operation["requestBody"].get("content", {})
-        if "application/json" not in content:
-            return None
-
-        schema = content["application/json"].get("schema", {})
-        if "$ref" in schema:
-            schema = self._resolve_ref(schema["$ref"])
-
-        return self._create_model("RequestBody", schema)
 
     def _parse_response_model(self, operation: dict[str, Any]) -> type[BaseModel] | None:
         """Parse response schema into Pydantic model.
@@ -259,23 +263,6 @@ class OperationParser:
 
         return self._create_model("Response", schema)
 
-    def get_operations(self) -> list[str]:
-        """Get list of all operation IDs from spec.
-
-        Returns:
-            List of operation IDs
-        """
-        operations = []
-
-        for path in self._paths.values():
-            for method, operation in path.items():
-                if method.startswith("x-") or method == "parameters":
-                    continue
-                if "operationId" in operation:
-                    operations.append(operation["operationId"])
-
-        return operations
-
     def _create_model(self, name: str, schema: dict[str, Any]) -> type[BaseModel]:
         """Create Pydantic model from schema.
 
@@ -292,21 +279,18 @@ class OperationParser:
         if "$ref" in schema:
             schema = self._resolve_ref(schema["$ref"])
 
-        if schema.get("type") != "object":
+        if schema.get("type", "object") != "object":
             raise ValueError("Schema must be an object type")
 
         fields = {}
         for prop_name, prop_schema in schema.get("properties", {}).items():
-            # Resolve property schema reference if needed
             if "$ref" in prop_schema:
                 prop_schema = self._resolve_ref(prop_schema["$ref"])
 
             if prop_schema.get("type") == "object":
-                # Create nested model
                 nested_model = self._create_model(f"{name}_{prop_name}", prop_schema)
                 field_type = nested_model
             elif prop_schema.get("type") == "array":
-                # Handle array types
                 items = prop_schema.get("items", {})
                 if "$ref" in items:
                     items = self._resolve_ref(items["$ref"])
@@ -328,3 +312,16 @@ class OperationParser:
         except Exception as e:
             logger.error("Error creating model %s: %s", name, e)
             raise ValueError(f"Failed to create model {name}: {e}")
+
+    def get_operations(self) -> list[str]:
+        """Get list of all operation IDs from spec."""
+        operations = []
+
+        for path in self._paths.values():
+            for method, operation in path.items():
+                if method.startswith("x-") or method == "parameters":
+                    continue
+                if "operationId" in operation:
+                    operations.append(operation["operationId"])
+
+        return operations

@@ -39,33 +39,32 @@ def test_parse_operation_with_path_params(parser: OperationParser) -> None:
     operation = parser.parse_operation("get_dag")
 
     assert operation.path == "/dags/{dag_id}"
-    assert "dag_id" in operation.parameters["path"]
-    param = operation.parameters["path"]["dag_id"]
-    assert isinstance(param["type"], type(str))
-    assert param["required"] is True
+    assert isinstance(operation.input_model, type(BaseModel))
+
+    # Verify path parameter field exists
+    fields = operation.input_model.__annotations__
+    assert "path_dag_id" in fields
+    assert isinstance(fields["path_dag_id"], type(str))
 
 
 def test_parse_operation_with_query_params(parser: OperationParser) -> None:
     """Test parsing operation with query parameters."""
     operation = parser.parse_operation("get_dags")
 
-    assert "limit" in operation.parameters["query"]
-    param = operation.parameters["query"]["limit"]
-    assert isinstance(param["type"], type(int))
-    assert param["required"] is False
+    # Verify query parameter field exists
+    fields = operation.input_model.__annotations__
+    assert "query_limit" in fields
+    assert isinstance(fields["query_limit"], type(int))
 
 
-def test_parse_operation_with_request_body(parser: OperationParser) -> None:
+def test_parse_operation_with_body_params(parser: OperationParser) -> None:
     """Test parsing operation with request body."""
     operation = parser.parse_operation("post_dag_run")
 
-    assert operation.request_body is not None
-    assert issubclass(operation.request_body, BaseModel)
-
-    # Test model fields
-    fields = operation.request_body.__annotations__
-    assert "dag_run_id" in fields
-    assert isinstance(fields["dag_run_id"], type(str))
+    # Verify body fields exist
+    fields = operation.input_model.__annotations__
+    assert "body_dag_run_id" in fields
+    assert isinstance(fields["body_dag_run_id"], type(str))
 
 
 def test_parse_operation_with_response_model(parser: OperationParser) -> None:
@@ -140,9 +139,7 @@ def test_create_model_nested_objects(parser: OperationParser) -> None:
     assert issubclass(model, BaseModel)
     fields = model.__annotations__
     assert "nested" in fields
-    # Check that nested field is a Pydantic model
     assert issubclass(fields["nested"], BaseModel)
-    # Verify nested model structure
     nested_fields = fields["nested"].__annotations__
     assert "field" in nested_fields
     assert isinstance(nested_fields["field"], type(str))

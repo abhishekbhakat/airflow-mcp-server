@@ -32,7 +32,7 @@ def operation_details():
                 "filter": {"type": str, "required": False},
             },
         },
-        request_body=TestRequestModel,
+        input_model=TestRequestModel,
         response_model=TestResponseModel,
     )
 

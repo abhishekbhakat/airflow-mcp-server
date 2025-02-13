@@ -1,10 +1,11 @@
 import logging
 from typing import Any
 
+from pydantic import BaseModel, ValidationError
+
 from airflow_mcp_server.client.airflow_client import AirflowClient
 from airflow_mcp_server.parser.operation_parser import OperationDetails
 from airflow_mcp_server.tools.base_tools import BaseTools
-from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -48,77 +49,64 @@ class AirflowTool(BaseTools):
         self.operation = operation_details
         self.client = client
 
-    def _validate_parameters(
+    def _validate_input(
         self,
         path_params: dict[str, Any] | None = None,
         query_params: dict[str, Any] | None = None,
         body: dict[str, Any] | None = None,
-    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
-        """Validate input parameters against operation schemas.
+    ) -> dict[str, Any]:
+        """Validate input parameters using unified input model.
 
         Args:
-            path_params: URL path parameters
-            query_params: URL query parameters
-            body: Request body data
+            path_params: Path parameters
+            query_params: Query parameters
+            body: Body parameters
 
         Returns:
-            Tuple of validated (path_params, query_params, body)
-
-        Raises:
-            ValidationError: If parameters fail validation
+            dict[str, Any]: Validated input parameters
         """
-        validated_params: dict[str, dict[str, Any] | None] = {
-            "path": None,
-            "query": None,
-            "body": None,
-        }
-
         try:
-            # Validate path parameters
-            if path_params and "path" in self.operation.parameters:
-                path_schema = self.operation.parameters["path"]
-                for name, value in path_params.items():
-                    if name in path_schema:
-                        param_type = path_schema[name]["type"]
-                        if not isinstance(value, param_type):
-                            raise create_validation_error(
-                                field=name,
-                                message=f"Path parameter {name} must be of type {param_type.__name__}",
-                            )
-                validated_params["path"] = path_params
+            input_data = {}
 
-            # Validate query parameters
-            if query_params and "query" in self.operation.parameters:
-                query_schema = self.operation.parameters["query"]
-                for name, value in query_params.items():
-                    if name in query_schema:
-                        param_type = query_schema[name]["type"]
-                        if not isinstance(value, param_type):
-                            raise create_validation_error(
-                                field=name,
-                                message=f"Query parameter {name} must be of type {param_type.__name__}",
-                            )
-                validated_params["query"] = query_params
+            if path_params:
+                input_data.update({f"path_{k}": v for k, v in path_params.items()})
 
-            # Validate request body
-            if body and self.operation.request_body:
-                try:
-                    model: type[BaseModel] = self.operation.request_body
-                    validated_body = model(**body)
-                    validated_params["body"] = validated_body.model_dump()
-                except ValidationError as e:
-                    # Re-raise Pydantic validation errors directly
-                    raise e
+            if query_params:
+                input_data.update({f"query_{k}": v for k, v in query_params.items()})
 
-            return (
-                validated_params["path"],
-                validated_params["query"],
-                validated_params["body"],
-            )
+            if body:
+                input_data.update({f"body_{k}": v for k, v in body.items()})
 
-        except Exception as e:
-            logger.error("Parameter validation failed: %s", e)
+            validated = self.operation.input_model(**input_data)
+            return validated.model_dump()
+
+        except ValidationError as e:
+            logger.error("Input validation failed: %s", e)
             raise
+
+    def _extract_parameters(self, validated_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        """Extract validated parameters by type."""
+        path_params = {}
+        query_params = {}
+        body = {}
+
+        # Extract parameters based on operation definition
+        for key, value in validated_input.items():
+            # Remove prefix from key if present
+            param_key = key
+            if key.startswith(("path_", "query_", "body_")):
+                param_key = key.split("_", 1)[1]
+
+            if key.startswith("path_"):
+                path_params[param_key] = value
+            elif key.startswith("query_"):
+                query_params[param_key] = value
+            elif key.startswith("body_"):
+                body[param_key] = value
+            else:
+                body[key] = value
+
+        return path_params, query_params, body
 
     async def run(
         self,
@@ -126,30 +114,17 @@ class AirflowTool(BaseTools):
         query_params: dict[str, Any] | None = None,
         body: dict[str, Any] | None = None,
     ) -> Any:
-        """Execute the operation with provided parameters.
-
-        Args:
-            path_params: URL path parameters
-            query_params: URL query parameters
-            body: Request body data
-
-        Returns:
-            API response data
-
-        Raises:
-            ValidationError: If parameters fail validation
-            RuntimeError: If client execution fails
-        """
+        """Execute the operation with provided parameters."""
         try:
-            # Validate parameters
-            validated_path_params, validated_query_params, validated_body = self._validate_parameters(path_params, query_params, body)
+            validated_input = self._validate_input(path_params, query_params, body)
+            path_params, query_params, body = self._extract_parameters(validated_input)
 
             # Execute operation
             response = await self.client.execute(
                 operation_id=self.operation.operation_id,
-                path_params=validated_path_params,
-                query_params=validated_query_params,
-                body=validated_body,
+                path_params=path_params,
+                query_params=query_params,
+                body=body,
             )
 
             # Validate response if model exists

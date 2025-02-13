@@ -52,7 +52,7 @@ def get_airflow_tools() -> list[Tool]:
         Tool(
             name=operation_id,
             description=tool.operation.operation_id,
-            inputSchema=tool.operation.request_body.model_json_schema() if tool.operation.request_body else None,
+            inputSchema=tool.operation.input_model.model_json_schema(),
         )
         for operation_id, tool in _tools_cache.items()
     ]
