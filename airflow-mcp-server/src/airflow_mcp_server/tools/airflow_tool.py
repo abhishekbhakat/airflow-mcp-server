@@ -32,14 +32,17 @@ def create_validation_error(field: str, message: str) -> ValidationError:
 
 
 class AirflowTool(BaseTools):
-    """Tool for executing Airflow API operations."""
+    """
+    Tool for executing Airflow API operations.
+    AirflowTool is supposed to have objects per operation.
+    """
 
     def __init__(self, operation_details: OperationDetails, client: AirflowClient) -> None:
         """Initialize tool with operation details and client.
 
         Args:
-            operation_details: Parsed operation details
-            client: Configured Airflow API client
+            operation_details: Operation details
+            client: AirflowClient instance
         """
         super().__init__()
         self.operation = operation_details

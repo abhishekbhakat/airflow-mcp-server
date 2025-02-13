@@ -259,6 +259,23 @@ class OperationParser:
 
         return self._create_model("Response", schema)
 
+    def get_operations(self) -> list[str]:
+        """Get list of all operation IDs from spec.
+
+        Returns:
+            List of operation IDs
+        """
+        operations = []
+
+        for path in self._paths.values():
+            for method, operation in path.items():
+                if method.startswith("x-") or method == "parameters":
+                    continue
+                if "operationId" in operation:
+                    operations.append(operation["operationId"])
+
+        return operations
+
     def _create_model(self, name: str, schema: dict[str, Any]) -> type[BaseModel]:
         """Create Pydantic model from schema.
 
