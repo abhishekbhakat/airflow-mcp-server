@@ -21,13 +21,18 @@ async def serve() -> None:
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        return get_airflow_tools()
+        try:
+            return await get_airflow_tools()
+        except Exception as e:
+            logger.error("Failed to list tools: %s", e)
+            raise
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         try:
-            tool = get_tool(name)
-            result = await tool.run(**arguments)
+            tool = await get_tool(name)
+            async with tool.client:
+                result = await tool.run(body=arguments)
             return [TextContent(type="text", text=str(result))]
         except Exception as e:
             logger.error("Tool execution failed: %s", e)

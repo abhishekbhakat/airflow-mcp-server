@@ -119,28 +119,34 @@ class OperationParser:
     ) -> type[BaseModel]:
         """Create unified input model for all parameters."""
         fields: dict[str, tuple[type, Any]] = {}
+        parameter_mapping = {"path": [], "query": [], "body": []}
 
         # Add path parameters
         for name, schema in parameters.get("path", {}).items():
             field_type = schema["type"]
             required = schema.get("required", True)  # Path parameters are required by default
-            fields[f"path_{name}"] = (field_type, ... if required else None)
+            fields[name] = (field_type, ... if required else None)
+            parameter_mapping["path"].append(name)
 
         # Add query parameters
         for name, schema in parameters.get("query", {}).items():
             field_type = schema["type"]
             required = schema.get("required", False)  # Query parameters are optional by default
-            fields[f"query_{name}"] = (field_type, ... if required else None)
+            fields[name] = (field_type, ... if required else None)
+            parameter_mapping["query"].append(name)
 
         # Add body fields if present
         if body_schema and body_schema.get("type") == "object":
             for prop_name, prop_schema in body_schema.get("properties", {}).items():
                 field_type = self._map_type(prop_schema.get("type", "string"))
                 required = prop_name in body_schema.get("required", [])
-                fields[f"body_{prop_name}"] = (field_type, ... if required else None)
+                fields[prop_name] = (field_type, ... if required else None)
+                parameter_mapping["body"].append(prop_name)
 
         logger.debug("Creating input model for %s with fields: %s", operation_id, fields)
-        return create_model(f"{operation_id}_input", **fields)
+        model = create_model(f"{operation_id}_input", **fields)
+        model.model_config["parameter_mapping"] = parameter_mapping
+        return model
 
     def extract_parameters(self, operation: dict[str, Any]) -> dict[str, Any]:
         """Extract and categorize operation parameters.

@@ -49,82 +49,23 @@ class AirflowTool(BaseTools):
         self.operation = operation_details
         self.client = client
 
-    def _validate_input(
-        self,
-        path_params: dict[str, Any] | None = None,
-        query_params: dict[str, Any] | None = None,
-        body: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Validate input parameters using unified input model.
-
-        Args:
-            path_params: Path parameters
-            query_params: Query parameters
-            body: Body parameters
-
-        Returns:
-            dict[str, Any]: Validated input parameters
-        """
-        try:
-            input_data = {}
-
-            if path_params:
-                input_data.update({f"path_{k}": v for k, v in path_params.items()})
-
-            if query_params:
-                input_data.update({f"query_{k}": v for k, v in query_params.items()})
-
-            if body:
-                input_data.update({f"body_{k}": v for k, v in body.items()})
-
-            validated = self.operation.input_model(**input_data)
-            return validated.model_dump()
-
-        except ValidationError as e:
-            logger.error("Input validation failed: %s", e)
-            raise
-
-    def _extract_parameters(self, validated_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-        """Extract validated parameters by type."""
-        path_params = {}
-        query_params = {}
-        body = {}
-
-        # Extract parameters based on operation definition
-        for key, value in validated_input.items():
-            # Remove prefix from key if present
-            param_key = key
-            if key.startswith(("path_", "query_", "body_")):
-                param_key = key.split("_", 1)[1]
-
-            if key.startswith("path_"):
-                path_params[param_key] = value
-            elif key.startswith("query_"):
-                query_params[param_key] = value
-            elif key.startswith("body_"):
-                body[param_key] = value
-            else:
-                body[key] = value
-
-        return path_params, query_params, body
-
     async def run(
         self,
-        path_params: dict[str, Any] | None = None,
-        query_params: dict[str, Any] | None = None,
         body: dict[str, Any] | None = None,
     ) -> Any:
         """Execute the operation with provided parameters."""
         try:
-            validated_input = self._validate_input(path_params, query_params, body)
-            path_params, query_params, body = self._extract_parameters(validated_input)
+            mapping = self.operation.input_model.model_config["parameter_mapping"]
+            path_params = {k: body[k] for k in mapping.get("path", []) if k in body}
+            query_params = {k: body[k] for k in mapping.get("query", []) if k in body}
+            body_params = {k: body[k] for k in mapping.get("body", []) if k in body}
 
             # Execute operation
             response = await self.client.execute(
                 operation_id=self.operation.operation_id,
                 path_params=path_params,
                 query_params=query_params,
-                body=body,
+                body=body_params,
             )
 
             # Validate response if model exists
