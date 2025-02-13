@@ -6,7 +6,10 @@ from typing import Any, BinaryIO, TextIO
 
 import aiohttp
 import yaml
+from jsonschema_path import SchemaPath
 from openapi_core import OpenAPI
+from openapi_core.validation.request.validators import V31RequestValidator
+from openapi_spec_validator import validate
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,18 @@ class AirflowClient:
             else:
                 raise ValueError("Invalid spec_path type. Expected Path, str, dict, bytes or file-like object")
 
+            # Validate spec has required fields
+            if not isinstance(self.raw_spec, dict):
+                raise ValueError("OpenAPI spec must be a dictionary")
+
+            required_fields = ["openapi", "info", "paths"]
+            for field in required_fields:
+                if field not in self.raw_spec:
+                    raise ValueError(f"OpenAPI spec missing required field: {field}")
+
+            # Validate OpenAPI spec format
+            validate(self.raw_spec)
+
             # Initialize OpenAPI spec
             self.spec = OpenAPI.from_dict(self.raw_spec)
             logger.debug("OpenAPI spec loaded successfully")
@@ -75,6 +90,10 @@ class AirflowClient:
             self._paths = self.raw_spec["paths"]
             logger.debug("Using raw spec paths")
 
+            # Initialize request validator with schema path
+            schema_path = SchemaPath.from_dict(self.raw_spec)
+            self._validator = V31RequestValidator(schema_path)
+
             # API configuration
             self.base_url = base_url.rstrip("/")
             self.headers = {
@@ -85,16 +104,14 @@ class AirflowClient:
 
         except Exception as e:
             logger.error("Failed to initialize AirflowClient: %s", e)
-            raise
+            raise ValueError(f"Failed to initialize client: {e}")
 
     async def __aenter__(self) -> "AirflowClient":
-        """Enter async context, creating session."""
         self._session = aiohttp.ClientSession(headers=self.headers)
         return self
 
     async def __aexit__(self, *exc) -> None:
-        """Exit async context, closing session."""
-        if self._session:
+        if hasattr(self, "_session"):
             await self._session.close()
             delattr(self, "_session")
 
@@ -135,6 +152,23 @@ class AirflowClient:
             logger.error("Error getting operation %s: %s", operation_id, e)
             raise
 
+    def _validate_path_params(self, path: str, params: dict[str, Any] | None) -> None:
+        if not params:
+            params = {}
+
+        # Extract path parameter names from the path
+        path_params = set(re.findall(r"{([^}]+)}", path))
+
+        # Check for missing required parameters
+        missing_params = path_params - set(params.keys())
+        if missing_params:
+            raise ValueError(f"Missing required path parameters: {missing_params}")
+
+        # Check for invalid parameters
+        invalid_params = set(params.keys()) - path_params
+        if invalid_params:
+            raise ValueError(f"Invalid path parameters: {invalid_params}")
+
     async def execute(
         self,
         operation_id: str,
@@ -165,6 +199,9 @@ class AirflowClient:
             # Get operation details
             path, method, _ = self._get_operation(operation_id)
 
+            # Validate path parameters
+            self._validate_path_params(path, path_params)
+
             # Format URL
             if path_params:
                 path = path.format(**path_params)
@@ -182,6 +219,9 @@ class AirflowClient:
                 response.raise_for_status()
                 return await response.json()
 
-        except Exception as e:
+        except aiohttp.ClientError as e:
             logger.error("Error executing operation %s: %s", operation_id, e)
             raise
+        except Exception as e:
+            logger.error("Error executing operation %s: %s", operation_id, e)
+            raise ValueError(f"Failed to execute operation: {e}")
