@@ -1,3 +1,3 @@
-from airflow_mcp_server.server import main
+from airflow_mcp_server import main
 
 main()

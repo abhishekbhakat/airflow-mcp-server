@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -8,9 +9,8 @@ from airflow_mcp_server.server import serve
 
 
 @click.command()
-@click.option("-y", "--yaml-spec", type=Path, help="YAML spec file")
 @click.option("-v", "--verbose", count=True)
-def main(yaml_spec: Path | None, verbose: bool) -> None:
+def main(verbose: bool) -> None:
     """MCP server for Airflow"""
     import asyncio
 
@@ -21,7 +21,7 @@ def main(yaml_spec: Path | None, verbose: bool) -> None:
         logging_level = logging.DEBUG
 
     logging.basicConfig(level=logging_level, stream=sys.stderr)
-    asyncio.run(serve(yaml_spec))
+    asyncio.run(serve())
 
 
 if __name__ == "__main__":
