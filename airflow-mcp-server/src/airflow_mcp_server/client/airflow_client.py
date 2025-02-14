@@ -97,7 +97,7 @@ class AirflowClient:
             # API configuration
             self.base_url = base_url.rstrip("/")
             self.headers = {
-                "Authorization": f"Bearer {auth_token}",
+                "Authorization": f"Basic {auth_token}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             }
@@ -208,6 +208,8 @@ class AirflowClient:
             url = f"{self.base_url}{path}"
 
             logger.debug("Executing %s %s", method, url)
+            logger.debug("Request body: %s", body)
+            logger.debug("Request query params: %s", query_params)
 
             # Make request
             async with self._session.request(
@@ -217,6 +219,7 @@ class AirflowClient:
                 json=body,
             ) as response:
                 response.raise_for_status()
+                logger.debug("Response: %s", await response.text())
                 return await response.json()
 
         except aiohttp.ClientError as e:
