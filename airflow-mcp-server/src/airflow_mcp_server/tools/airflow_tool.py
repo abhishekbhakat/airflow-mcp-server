@@ -56,6 +56,7 @@ class AirflowTool(BaseTools):
         """Execute the operation with provided parameters."""
         try:
             mapping = self.operation.input_model.model_config["parameter_mapping"]
+            body = body or {}
             path_params = {k: body[k] for k in mapping.get("path", []) if k in body}
             query_params = {k: body[k] for k in mapping.get("query", []) if k in body}
             body_params = {k: body[k] for k in mapping.get("body", []) if k in body}
@@ -68,14 +69,22 @@ class AirflowTool(BaseTools):
                 body=body_params,
             )
 
+            logger.debug("Raw response: %s", response)
+
             # Validate response if model exists
             if self.operation.response_model and isinstance(response, dict):
                 try:
+                    logger.debug("Response model schema: %s", self.operation.response_model.model_json_schema())
                     model: type[BaseModel] = self.operation.response_model
+                    logger.debug("Attempting to validate response with model: %s", model.__name__)
                     validated_response = model(**response)
-                    return validated_response.model_dump()
+                    logger.debug("Response validation successful")
+                    result = validated_response.model_dump()
+                    logger.debug("Final response after model_dump: %s", result)
+                    return result
                 except ValidationError as e:
                     logger.error("Response validation failed: %s", e)
+                    logger.error("Validation error details: %s", e.errors())
                     raise RuntimeError(f"Invalid response format: {e}")
 
             return response
