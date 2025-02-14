@@ -13,9 +13,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server for controll
 {
   "mcpServers": {
     "airflow-mcp-server": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "run",
         "airflow-mcp-server"
       ],
       "env": {
