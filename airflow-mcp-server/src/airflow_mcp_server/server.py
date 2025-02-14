@@ -8,6 +8,15 @@ from mcp.types import TextContent, Tool
 
 from airflow_mcp_server.tools.tool_manager import get_airflow_tools, get_tool
 
+# ===========THIS IS FOR DEBUGGING WITH MCP INSPECTOR===================
+# import sys
+# Configure root logger to stderr
+# logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.StreamHandler(sys.stderr)])
+
+# Disable Uvicorn's default handlers
+# logging.getLogger("uvicorn.error").handlers = []
+# logging.getLogger("uvicorn.access").handlers = []
+# ======================================================================
 logger = logging.getLogger(__name__)
 
 
