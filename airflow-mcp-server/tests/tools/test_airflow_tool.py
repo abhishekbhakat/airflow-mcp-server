@@ -6,7 +6,7 @@ from airflow_mcp_server.parser.operation_parser import OperationDetails
 from airflow_mcp_server.tools.airflow_tool import AirflowTool
 from pydantic import ValidationError
 
-from tests.tools.test_models import TestRequestModel, TestResponseModel
+from tests.tools.test_models import TestRequestModel
 
 
 @pytest.fixture
@@ -20,20 +20,27 @@ def mock_client(mocker):
 @pytest.fixture
 def operation_details():
     """Create test operation details."""
+    model = TestRequestModel
+    # Add parameter mapping to model config
+    model.model_config["parameter_mapping"] = {
+        "path": ["path_id"],
+        "query": ["query_filter"],
+        "body": ["body_name", "body_value"],
+    }
+
     return OperationDetails(
         operation_id="test_operation",
-        path="/test/{id}",
+        path="/test/{path_id}",
         method="POST",
         parameters={
             "path": {
-                "id": {"type": int, "required": True},
+                "path_id": {"type": int, "required": True},
             },
             "query": {
-                "filter": {"type": str, "required": False},
+                "query_filter": {"type": str, "required": False},
             },
         },
-        input_model=TestRequestModel,
-        response_model=TestResponseModel,
+        input_model=model,
     )
 
 
@@ -49,20 +56,23 @@ async def test_successful_execution(airflow_tool, mock_client):
     # Setup mock response
     mock_client.execute.return_value = {"item_id": 1, "result": "success"}
 
-    # Execute operation
+    # Execute operation with unified body
     result = await airflow_tool.run(
-        path_params={"id": 123},
-        query_params={"filter": "test"},
-        body={"name": "test", "value": 42},
+        body={
+            "path_id": 123,
+            "query_filter": "test",
+            "body_name": "test",
+            "body_value": 42,
+        }
     )
 
     # Verify response
     assert result == {"item_id": 1, "result": "success"}
     mock_client.execute.assert_called_once_with(
         operation_id="test_operation",
-        path_params={"id": 123},
-        query_params={"filter": "test"},
-        body={"name": "test", "value": 42},
+        path_params={"path_id": 123},
+        query_params={"query_filter": "test"},
+        body={"body_name": "test", "body_value": 42},
     )
 
 
@@ -71,8 +81,11 @@ async def test_invalid_path_parameter(airflow_tool):
     """Test validation error for invalid path parameter type."""
     with pytest.raises(ValidationError):
         await airflow_tool.run(
-            path_params={"id": "not_an_integer"},
-            body={"name": "test", "value": 42},
+            body={
+                "path_id": "not_an_integer",  # Invalid type
+                "body_name": "test",
+                "body_value": 42,
+            }
         )
 
 
@@ -81,22 +94,29 @@ async def test_invalid_request_body(airflow_tool):
     """Test validation error for invalid request body."""
     with pytest.raises(ValidationError):
         await airflow_tool.run(
-            path_params={"id": 123},
-            body={"name": "test", "value": "not_an_integer"},
+            body={
+                "path_id": 123,
+                "body_name": "test",
+                "body_value": "not_an_integer",  # Invalid type
+            }
         )
 
 
 @pytest.mark.asyncio
 async def test_invalid_response_format(airflow_tool, mock_client):
     """Test error handling for invalid response format."""
-    # Setup mock response with invalid format
+    # Setup mock response
     mock_client.execute.return_value = {"invalid": "response"}
 
-    with pytest.raises(RuntimeError):
-        await airflow_tool.run(
-            path_params={"id": 123},
-            body={"name": "test", "value": 42},
-        )
+    # Should not raise any validation error
+    result = await airflow_tool.run(
+        body={
+            "path_id": 123,
+            "body_name": "test",
+            "body_value": 42,
+        }
+    )
+    assert result == {"invalid": "response"}
 
 
 @pytest.mark.asyncio
@@ -107,6 +127,9 @@ async def test_client_error(airflow_tool, mock_client):
 
     with pytest.raises(RuntimeError):
         await airflow_tool.run(
-            path_params={"id": 123},
-            body={"name": "test", "value": 42},
+            body={
+                "path_id": 123,
+                "body_name": "test",
+                "body_value": 42,
+            }
         )

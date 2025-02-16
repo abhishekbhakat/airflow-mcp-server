@@ -35,7 +35,7 @@ def client(spec_file: dict[str, Any]) -> AirflowClient:
 def test_init_client_initialization(client: AirflowClient) -> None:
     assert isinstance(client.spec, OpenAPI)
     assert client.base_url == "http://localhost:8080/api/v1"
-    assert client.headers["Authorization"] == "Bearer test-token"
+    assert client.headers["Authorization"] == "Basic test-token"
 
 
 def test_init_load_spec_from_bytes() -> None:

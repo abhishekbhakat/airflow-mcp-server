@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from airflow_mcp_server.client.airflow_client import AirflowClient
 from airflow_mcp_server.parser.operation_parser import OperationDetails
@@ -55,40 +55,27 @@ class AirflowTool(BaseTools):
     ) -> Any:
         """Execute the operation with provided parameters."""
         try:
-            mapping = self.operation.input_model.model_config["parameter_mapping"]
-            body = body or {}
-            path_params = {k: body[k] for k in mapping.get("path", []) if k in body}
-            query_params = {k: body[k] for k in mapping.get("query", []) if k in body}
-            body_params = {k: body[k] for k in mapping.get("body", []) if k in body}
+            # Validate input
+            validated_input = self.operation.input_model(**(body or {}))
+            validated_body = validated_input.model_dump(exclude_none=True)  # Only include non-None values
 
-            # Execute operation
+            mapping = self.operation.input_model.model_config["parameter_mapping"]
+            path_params = {k: validated_body[k] for k in mapping.get("path", []) if k in validated_body}
+            query_params = {k: validated_body[k] for k in mapping.get("query", []) if k in validated_body}
+            body_params = {k: validated_body[k] for k in mapping.get("body", []) if k in validated_body}
+
+            # Execute operation and return raw response
             response = await self.client.execute(
                 operation_id=self.operation.operation_id,
-                path_params=path_params,
-                query_params=query_params,
-                body=body_params,
+                path_params=path_params or None,
+                query_params=query_params or None,
+                body=body_params or None,
             )
-
-            logger.debug("Raw response: %s", response)
-
-            # Validate response if model exists
-            if self.operation.response_model and isinstance(response, dict):
-                try:
-                    logger.debug("Response model schema: %s", self.operation.response_model.model_json_schema())
-                    model: type[BaseModel] = self.operation.response_model
-                    logger.debug("Attempting to validate response with model: %s", model.__name__)
-                    validated_response = model(**response)
-                    logger.debug("Response validation successful")
-                    result = validated_response.model_dump()
-                    logger.debug("Final response after model_dump: %s", result)
-                    return result
-                except ValidationError as e:
-                    logger.error("Response validation failed: %s", e)
-                    logger.error("Validation error details: %s", e.errors())
-                    raise RuntimeError(f"Invalid response format: {e}")
 
             return response
 
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error("Operation execution failed: %s", e)
             raise

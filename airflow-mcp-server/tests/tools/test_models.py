@@ -10,10 +10,3 @@ class TestRequestModel(BaseModel):
     query_filter: str | None = None
     body_name: str
     body_value: int
-
-
-class TestResponseModel(BaseModel):
-    """Test response model."""
-
-    item_id: int
-    result: str

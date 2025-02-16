@@ -20,7 +20,6 @@ class OperationDetails:
     method: str
     parameters: dict[str, Any]
     input_model: type[BaseModel]
-    response_model: type[BaseModel] | None = None
 
 
 class OperationParser:
@@ -83,7 +82,6 @@ class OperationParser:
                         operation["path_item"] = path_item
 
                         parameters = self.extract_parameters(operation)
-                        response_model = self._parse_response_model(operation)
 
                         # Get request body schema if present
                         body_schema = None
@@ -97,14 +95,7 @@ class OperationParser:
                         # Create unified input model
                         input_model = self._create_input_model(operation_id, parameters, body_schema)
 
-                        return OperationDetails(
-                            operation_id=operation_id,
-                            path=str(path),
-                            method=method,
-                            parameters=parameters,
-                            input_model=input_model,
-                            response_model=response_model,
-                        )
+                        return OperationDetails(operation_id=operation_id, path=str(path), method=method, parameters=parameters, input_model=input_model)
 
             raise ValueError(f"Operation {operation_id} not found in spec")
 
@@ -124,24 +115,21 @@ class OperationParser:
 
         # Add path parameters
         for name, schema in parameters.get("path", {}).items():
-            field_type = schema["type"]
-            required = schema.get("required", True)  # Path parameters are required by default
-            fields[name] = (field_type, ... if required else None)
+            field_type = schema["type"]  # Use the mapped type from parameter schema
+            fields[name] = (field_type | None, None)  # Make all optional
             parameter_mapping["path"].append(name)
 
         # Add query parameters
         for name, schema in parameters.get("query", {}).items():
-            field_type = schema["type"]
-            required = schema.get("required", False)  # Query parameters are optional by default
-            fields[name] = (field_type, ... if required else None)
+            field_type = schema["type"]  # Use the mapped type from parameter schema
+            fields[name] = (field_type | None, None)  # Make all optional
             parameter_mapping["query"].append(name)
 
         # Add body fields if present
         if body_schema and body_schema.get("type") == "object":
             for prop_name, prop_schema in body_schema.get("properties", {}).items():
-                field_type = self._map_type(prop_schema.get("type", "string"), prop_schema.get("format"))
-                required = prop_name in body_schema.get("required", [])
-                fields[prop_name] = (field_type, ... if required else None)
+                field_type = self._map_type(prop_schema.get("type", "string"), prop_schema.get("format"), prop_schema)
+                fields[prop_name] = (field_type | None, None)  # Make all optional
                 parameter_mapping["body"].append(prop_name)
 
         logger.debug("Creating input model for %s with fields: %s", operation_id, fields)
@@ -224,8 +212,12 @@ class OperationParser:
         if "$ref" in schema:
             schema = self._resolve_ref(schema["$ref"])
 
+        # Get the type and format from schema
+        openapi_type = schema.get("type", "string")
+        format_type = schema.get("format")
+
         return {
-            "type": self._map_type(schema.get("type", "string")),
+            "type": self._map_type(openapi_type, format_type, schema),  # Pass format_type and full schema
             "required": param.get("required", False),
             "default": schema.get("default"),
             "description": param.get("description"),
@@ -291,7 +283,7 @@ class OperationParser:
             logger.error("Failed to create response model: %s", e)
             return None
 
-    def _create_model(self, name: str, schema: dict[str, Any]) -> type[BaseModel]:
+    def _create_model(self, name: str, schema: dict[str, Any]) -> type[BaseModel]:  # noqa C901
         """Create Pydantic model from schema.
 
         Args:

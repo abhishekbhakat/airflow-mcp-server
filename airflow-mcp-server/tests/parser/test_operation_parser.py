@@ -43,8 +43,11 @@ def test_parse_operation_with_path_params(parser: OperationParser) -> None:
 
     # Verify path parameter field exists
     fields = operation.input_model.__annotations__
-    assert "path_dag_id" in fields
-    assert isinstance(fields["path_dag_id"], type(str))
+    assert "dag_id" in fields
+    assert str in fields["dag_id"].__args__  # Check if str is in the Union types
+
+    # Verify parameter is mapped correctly
+    assert "dag_id" in operation.input_model.model_config["parameter_mapping"]["path"]
 
 
 def test_parse_operation_with_query_params(parser: OperationParser) -> None:
@@ -53,8 +56,11 @@ def test_parse_operation_with_query_params(parser: OperationParser) -> None:
 
     # Verify query parameter field exists
     fields = operation.input_model.__annotations__
-    assert "query_limit" in fields
-    assert isinstance(fields["query_limit"], type(int))
+    assert "limit" in fields
+    assert int in fields["limit"].__args__  # Check if int is in the Union types
+
+    # Verify parameter is mapped correctly
+    assert "limit" in operation.input_model.model_config["parameter_mapping"]["query"]
 
 
 def test_parse_operation_with_body_params(parser: OperationParser) -> None:
@@ -63,21 +69,11 @@ def test_parse_operation_with_body_params(parser: OperationParser) -> None:
 
     # Verify body fields exist
     fields = operation.input_model.__annotations__
-    assert "body_dag_run_id" in fields
-    assert isinstance(fields["body_dag_run_id"], type(str))
+    assert "dag_run_id" in fields
+    assert str in fields["dag_run_id"].__args__  # Check if str is in the Union types
 
-
-def test_parse_operation_with_response_model(parser: OperationParser) -> None:
-    """Test parsing operation with response model."""
-    operation = parser.parse_operation("get_dag")
-
-    assert operation.response_model is not None
-    assert issubclass(operation.response_model, BaseModel)
-
-    # Test model fields
-    fields = operation.response_model.__annotations__
-    assert "dag_id" in fields
-    assert "is_paused" in fields
+    # Verify parameter is mapped correctly
+    assert "dag_run_id" in operation.input_model.model_config["parameter_mapping"]["body"]
 
 
 def test_parse_operation_not_found(parser: OperationParser) -> None:
@@ -118,7 +114,9 @@ def test_map_parameter_schema_nullable(parser: OperationParser) -> None:
     }
 
     result = parser._map_parameter_schema(param)
-    assert isinstance(result["type"], type(str))
+    # Check that str is in the Union types
+    assert str in result["type"].__args__
+    assert None.__class__ in result["type"].__args__  # Check for NoneType
     assert not result["required"]
 
 
