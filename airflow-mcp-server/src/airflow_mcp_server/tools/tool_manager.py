@@ -68,8 +68,11 @@ async def _initialize_tools() -> None:
         raise ValueError(f"Failed to initialize tools: {e}") from e
 
 
-async def get_airflow_tools() -> list[Tool]:
-    """Get list of all available Airflow tools.
+async def get_airflow_tools(mode: str = "unsafe") -> list[Tool]:
+    """Get list of available Airflow tools based on mode.
+
+    Args:
+        mode: "safe" for GET operations only, "unsafe" for all operations (default)
 
     Returns:
         List of MCP Tool objects representing available operations
@@ -83,6 +86,9 @@ async def get_airflow_tools() -> list[Tool]:
     tools = []
     for operation_id, tool in _tools_cache.items():
         try:
+            # Skip non-GET operations in safe mode
+            if mode == "safe" and not tool.operation.method.lower() == "get":
+                continue
             schema = tool.operation.input_model.model_json_schema()
             tools.append(
                 Tool(
