@@ -98,7 +98,6 @@ class AirflowClient:
             self.base_url = base_url.rstrip("/")
             self.headers = {
                 "Authorization": f"Basic {auth_token}",
-                "Content-Type": "application/json",
                 "Accept": "application/json",
             }
 
@@ -211,6 +210,10 @@ class AirflowClient:
             logger.debug("Request body: %s", body)
             logger.debug("Request query params: %s", query_params)
 
+            # Dynamically set headers based on presence of body
+            request_headers = self.headers.copy()
+            if body is not None:
+                request_headers["Content-Type"] = "application/json"
             # Make request
             async with self._session.request(
                 method=method,
@@ -219,8 +222,23 @@ class AirflowClient:
                 json=body,
             ) as response:
                 response.raise_for_status()
-                logger.debug("Response: %s", await response.text())
-                return await response.json()
+                content_type = response.headers.get("Content-Type", "").lower()
+                # Status codes that typically have no body
+                no_body_statuses = {204}
+                if response.status in no_body_statuses:
+                    if content_type and "application/json" in content_type:
+                        logger.warning("Unexpected JSON body with status %s", response.status)
+                        return await response.json()  # Parse if present, though rare
+                    logger.debug("Received %s response with no body", response.status)
+                    return response.status
+                # For statuses expecting a body, check mimetype
+                if "application/json" in content_type:
+                    logger.debug("Response: %s", await response.text())
+                    return await response.json()
+                # Unexpected mimetype with body
+                response_text = await response.text()
+                logger.error("Unexpected mimetype %s for status %s: %s", content_type, response.status, response_text)
+                raise ValueError(f"Cannot parse response with mimetype {content_type} as JSON")
 
         except aiohttp.ClientError as e:
             logger.error("Error executing operation %s: %s", operation_id, e)
