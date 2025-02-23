@@ -38,6 +38,14 @@ exclude = [
     "!pyproject.toml"
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/airflow_mcp_server"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/airflow_mcp_server" = [
+    "*.yaml",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 asyncio_mode = "strict"
