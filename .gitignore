@@ -172,7 +172,7 @@ cython_debug/
 
 
 # Local Resources
-resources/
+project_resources/
 ._*.py
 ._.repo_ignore
 .repo_ignore

@@ -1,5 +1,6 @@
 import logging
 import os
+from importlib import resources
 
 from mcp.types import Tool
 
@@ -13,20 +14,30 @@ _tools_cache: dict[str, AirflowTool] = {}
 
 
 def _initialize_client() -> AirflowClient:
-    """Initialize Airflow client with environment variables.
+    """Initialize Airflow client with environment variables or embedded spec.
 
     Returns:
         AirflowClient instance
 
     Raises:
-        ValueError: If required environment variables are missing
+        ValueError: If required environment variables are missing or default spec is not found
     """
-    required_vars = ["OPENAPI_SPEC", "AIRFLOW_BASE_URL", "AUTH_TOKEN"]
+    spec_path = os.environ.get("OPENAPI_SPEC")
+    if not spec_path:
+        # Fallback to embedded v1.yaml
+        try:
+            with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
+                spec_path = f.name
+                logger.info("OPENAPI_SPEC not set; using embedded v1.yaml from %s", spec_path)
+        except Exception as e:
+            raise ValueError("Default OpenAPI spec not found in package resources") from e
+
+    required_vars = ["AIRFLOW_BASE_URL", "AUTH_TOKEN"]
     missing_vars = [var for var in required_vars if var not in os.environ]
     if missing_vars:
         raise ValueError(f"Missing required environment variables: {missing_vars}")
 
-    return AirflowClient(spec_path=os.environ["OPENAPI_SPEC"], base_url=os.environ["AIRFLOW_BASE_URL"], auth_token=os.environ["AUTH_TOKEN"])
+    return AirflowClient(spec_path=spec_path, base_url=os.environ["AIRFLOW_BASE_URL"], auth_token=os.environ["AUTH_TOKEN"])
 
 
 async def _initialize_tools() -> None:
@@ -39,7 +50,11 @@ async def _initialize_tools() -> None:
 
     try:
         client = _initialize_client()
-        parser = OperationParser(os.environ["OPENAPI_SPEC"])
+        spec_path = os.environ.get("OPENAPI_SPEC")
+        if not spec_path:
+            with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
+                spec_path = f.name
+        parser = OperationParser(spec_path)
 
         # Generate tools for each operation
         for operation_id in parser.get_operations():
@@ -60,7 +75,7 @@ async def get_airflow_tools() -> list[Tool]:
         List of MCP Tool objects representing available operations
 
     Raises:
-        ValueError: If required environment variables are missing or initialization fails
+        ValueError: If initialization fails
     """
     if not _tools_cache:
         await _initialize_tools()
