@@ -18,15 +18,11 @@ def create_valid_spec(paths: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 @pytest.fixture
-def spec_file() -> dict[str, Any]:
-    with resources.files("tests.client").joinpath("v1.yaml").open("r") as f:
-        return yaml.safe_load(f)
-
-
-@pytest.fixture
-def client(spec_file: dict[str, Any]) -> AirflowClient:
+def client() -> AirflowClient:
+    with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
+        spec = yaml.safe_load(f)
     return AirflowClient(
-        spec_path=spec_file,
+        spec_path=spec,
         base_url="http://localhost:8080/api/v1",
         auth_token="test-token",
     )
@@ -84,9 +80,9 @@ def test_ops_case_sensitive_operation(client: AirflowClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_exec_without_context(spec_file: dict[str, Any]) -> None:
+async def test_exec_without_context() -> None:
     client = AirflowClient(
-        spec_path=spec_file,
+        spec_path=create_valid_spec(),
         base_url="http://test",
         auth_token="test",
     )
