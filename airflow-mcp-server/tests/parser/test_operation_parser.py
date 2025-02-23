@@ -141,3 +141,34 @@ def test_create_model_nested_objects(parser: OperationParser) -> None:
     nested_fields = fields["nested"].__annotations__
     assert "field" in nested_fields
     assert isinstance(nested_fields["field"], type(str))
+
+
+def test_parse_operation_with_allof_body(parser: OperationParser) -> None:
+    """Test parsing operation with allOf schema in request body."""
+    operation = parser.parse_operation("test_connection")
+
+    assert isinstance(operation, OperationDetails)
+    assert operation.operation_id == "test_connection"
+    assert operation.path == "/connections/test"
+    assert operation.method == "post"
+
+    # Verify input model includes fields from allOf schema
+    fields = operation.input_model.__annotations__
+    assert "connection_id" in fields, "Missing connection_id from ConnectionCollectionItem"
+    assert str in fields["connection_id"].__args__, "connection_id should be a string"
+    assert "password" in fields, "Missing password from Connection"
+    assert str in fields["password"].__args__, "password should be a string"
+    assert "connection_schema" in fields, "Missing schema field (aliased as connection_schema)"
+    assert str in fields["connection_schema"].__args__, "connection_schema should be a string"
+
+    # Verify parameter mapping
+    mapping = operation.input_model.model_config["parameter_mapping"]
+    assert "body" in mapping
+    assert "connection_id" in mapping["body"]
+    assert "password" in mapping["body"]
+    assert "connection_schema" in mapping["body"]
+
+    # Verify alias configuration
+    model_fields = operation.input_model.model_fields
+    assert "connection_schema" in model_fields
+    assert model_fields["connection_schema"].alias == "schema", "connection_schema should alias to schema"

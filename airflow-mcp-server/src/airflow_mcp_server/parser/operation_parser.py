@@ -57,6 +57,30 @@ class OperationParser:
             logger.error("Error initializing OperationParser: %s", e)
             raise ValueError(f"Failed to initialize parser: {e}") from e
 
+    def _merge_allof_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
+        """Merge an allOf schema into a single effective schema.
+
+        Args:
+            schema: The schema potentially containing allOf
+
+        Returns:
+            A merged schema with unified properties and required fields
+        """
+        if "allOf" not in schema:
+            return schema
+        merged = {"type": "object", "properties": {}, "required": []}
+        for subschema in schema["allOf"]:
+            resolved = subschema
+            if "$ref" in subschema:
+                resolved = self._resolve_ref(subschema["$ref"])
+            if "properties" in resolved:
+                merged["properties"].update(resolved["properties"])
+            if "required" in resolved:
+                merged["required"].extend(resolved.get("required", []))
+        merged["required"] = list(set(merged["required"]))  # Remove duplicates
+        logger.debug("Merged allOf schema: %s", merged)
+        return merged
+
     def parse_operation(self, operation_id: str) -> OperationDetails:
         """Parse operation details from OpenAPI spec.
 
@@ -125,12 +149,19 @@ class OperationParser:
             fields[name] = (field_type | None, None)  # Make all optional
             parameter_mapping["query"].append(name)
 
-        # Add body fields if present
-        if body_schema and body_schema.get("type") == "object":
-            for prop_name, prop_schema in body_schema.get("properties", {}).items():
-                field_type = self._map_type(prop_schema.get("type", "string"), prop_schema.get("format"), prop_schema)
-                fields[prop_name] = (field_type | None, None)  # Make all optional
-                parameter_mapping["body"].append(prop_name)
+        # Handle body schema with allOf support
+        if body_schema:
+            effective_schema = self._merge_allof_schema(body_schema)
+            if "properties" in effective_schema or effective_schema.get("type") == "object":
+                for prop_name, prop_schema in effective_schema.get("properties", {}).items():
+                    field_type = self._map_type(prop_schema.get("type", "string"), prop_schema.get("format"), prop_schema)
+                    default = None if prop_name in effective_schema.get("required", []) else None
+                    if prop_name == "schema":  # Avoid shadowing BaseModel.schema
+                        fields["connection_schema"] = (field_type | None, Field(default, alias="schema"))
+                        parameter_mapping["body"].append("connection_schema")
+                    else:
+                        fields[prop_name] = (field_type | None, default)
+                        parameter_mapping["body"].append(prop_name)
 
         logger.debug("Creating input model for %s with fields: %s", operation_id, fields)
         model = create_model(f"{operation_id}_input", **fields)
