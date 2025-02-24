@@ -3,6 +3,7 @@
 name = "airflow-wingman"
 version = "0.1.0"
 description = "Airflow plugin to enable LLMs chat"
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     {name = "Abhishek Bhakat", email = "abhishek.bhakat@hotmail.com"}
@@ -11,6 +12,12 @@ dependencies = [
     "apache-airflow>=2.10.0",
     "airflow-mcp-server>=0.2.0"
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
 
 [project.urls]
 repository = "https://github.com/abhishekbhakat/airflow-mcp-server"

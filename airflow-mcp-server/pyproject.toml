@@ -2,6 +2,7 @@
 name = "airflow-mcp-server"
 version = "0.2.0"
 description = "MCP Server for Airflow"
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     {name = "Abhishek Bhakat", email = "abhishek.bhakat@hotmail.com"}
@@ -16,6 +17,12 @@ dependencies = [
     "pydantic>=2.10.5",
     "pyyaml>=6.0.0",
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
 
 [project.urls]
 repository = "https://github.com/abhishekbhakat/airflow-mcp-server"
