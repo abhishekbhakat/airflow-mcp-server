@@ -10,7 +10,9 @@ authors = [
 ]
 dependencies = [
     "apache-airflow>=2.10.0",
-    "airflow-mcp-server>=0.2.0"
+    "airflow-mcp-server>=0.2.0",
+    "openai>=1.64.0",
+    "anthropic>=0.46.0"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

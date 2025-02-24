@@ -11,6 +11,8 @@
                 </div>
                 <div class="alert alert-info" style="margin: 15px;">
                     <p><strong>Note:</strong> For best results with function/tool calling capabilities, we recommend using models like Claude-3.5 Sonnet or GPT-4o. These models excel at understanding and using complex tools effectively.</p>
+                    <hr style="margin: 10px 0;">
+                    <p><strong>Security:</strong> For your security, API keys are required for each session and are never stored. If you refresh the page or close the browser, you'll need to enter your API key again. This ensures your API keys remain secure in shared environments.</p>
                 </div>
             </div>
         </div>
@@ -34,7 +36,6 @@
                                        name="model"
                                        value="{{ provider_id }}:{{ model.id }}"
                                        {% if model.default %}checked{% endif %}
-                                       data-endpoint="{{ provider.endpoint }}"
                                        data-context-window="{{ model.context_window }}"
                                        data-provider="{{ provider_id }}"
                                        data-model-name="{{ model.name }}">
@@ -51,6 +52,21 @@
                     <div class="form-group">
                         <label for="modelName">Model Name</label>
                         <input type="text" class="form-control" id="modelName" placeholder="Enter model name for OpenRouter" disabled>
+                        <small class="form-text text-muted">Only required for OpenRouter provider</small>
+                    </div>
+                </div>
+
+                <!-- API Key Input -->
+                <div class="panel-body" style="border-top: 1px solid #ddd; padding-top: 15px;">
+                    <div class="form-group">
+                        <label for="api-key">API Key</label>
+                        <input type="password"
+                               class="form-control"
+                               id="api-key"
+                               placeholder="Enter API key for selected provider"
+                               required
+                               autocomplete="off">
+                        <small class="text-muted">Your API key will be used for the selected provider</small>
                     </div>
                 </div>
 
@@ -74,30 +90,11 @@
                 }
                 </style>
             </div>
-
-            <!-- API Key Input -->
-            <div class="panel panel-default mt-3">
-                <div class="panel-heading">
-                    <h3 class="panel-title">API Key</h3>
-                </div>
-                <div class="panel-body">
-                    <div class="form-group">
-                        <input type="password"
-                               class="form-control"
-                               id="api-key"
-                               placeholder="Enter your API key"
-                               autocomplete="off">
-                        <small class="text-muted">
-                            Your API key will be used for the selected provider
-                        </small>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Main Chat Window -->
         <div class="col-md-9">
-            <div class="panel panel-default" style="height: calc(100vh - 250px); display: flex; flex-direction: column;">
+            <div class="panel panel-default" style="height: calc(80vh - 250px); display: flex; flex-direction: column;">
                 <div class="panel-body" style="flex-grow: 1; overflow-y: auto; padding: 15px;" id="chat-messages">
                     <!-- Messages will be dynamically added here -->
                 </div>
@@ -180,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const modelName = this.getAttribute('data-model-name');
             console.log('Selected provider:', provider);
             console.log('Model name:', modelName);
-            
+
             if (provider === 'openrouter') {
                 console.log('Enabling model name input');
                 modelNameInput.disabled = false;
@@ -201,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const modelName = defaultSelected.getAttribute('data-model-name');
         console.log('Initial provider:', provider);
         console.log('Initial model name:', modelName);
-        
+
         if (provider === 'openrouter') {
             console.log('Initially enabling model name input');
             modelNameInput.disabled = false;
@@ -218,20 +215,105 @@ document.addEventListener('DOMContentLoaded', function() {
     const sendButton = document.getElementById('send-button');
     const chatMessages = document.getElementById('chat-messages');
 
+    let currentMessageDiv = null;
+
     function addMessage(content, isUser) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isUser ? 'message-user' : 'message-assistant'}`;
         messageDiv.textContent = content;
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+        return messageDiv;
     }
 
-    function sendMessage() {
+    async function sendMessage() {
         const message = messageInput.value.trim();
-        if (message) {
-            addMessage(message, true);
-            messageInput.value = '';
-            // TODO: Add API call to send message and get response
+        if (!message) return;
+
+        // Get selected model
+        const selectedModel = document.querySelector('input[name="model"]:checked');
+        if (!selectedModel) {
+            alert('Please select a model');
+            return;
+        }
+
+        const provider = selectedModel.getAttribute('data-provider');
+        const modelId = selectedModel.value.split(':')[1];
+        const modelName = provider === 'openrouter' ? modelNameInput.value : modelId;
+
+        // Clear input and add user message
+        messageInput.value = '';
+        addMessage(message, true);
+
+        try {
+            // Create messages array with system message
+            const messages = [
+                {
+                    role: 'system',
+                    content: 'You are a helpful AI assistant integrated into Apache Airflow.'
+                },
+                {
+                    role: 'user',
+                    content: message
+                }
+            ];
+
+            // Create assistant message div
+            currentMessageDiv = addMessage('', false);
+
+            // Get API key
+            const apiKey = document.getElementById('api-key').value.trim();
+            if (!apiKey) {
+                alert('Please enter an API key');
+                return;
+            }
+
+            // Send request
+            const response = await fetch('/wingman/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    provider: provider,
+                    model: modelName,
+                    messages: messages,
+                    api_key: apiKey,
+                    stream: true,
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to get response');
+            }
+
+            // Handle streaming response
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const content = line.slice(6);
+                        if (content) {
+                            currentMessageDiv.textContent += content;
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            currentMessageDiv.textContent = `Error: ${error.message}`;
+            currentMessageDiv.style.color = 'red';
         }
     }
 

@@ -1,10 +1,11 @@
+"""Plugin definition for Airflow Wingman."""
+
 from airflow.plugins_manager import AirflowPlugin
-from flask_appbuilder import BaseView as AppBuilderBaseView, expose
 from flask import Blueprint
 
-from airflow_wingman.llms_models import MODELS
+from airflow_wingman.views import WingmanView
 
-
+# Create Blueprint
 bp = Blueprint(
     "wingman",
     __name__,
@@ -12,21 +13,6 @@ bp = Blueprint(
     static_folder="static",
     static_url_path="/static/wingman",
 )
-
-
-class WingmanView(AppBuilderBaseView):
-    route_base = "/wingman"
-    default_view = "chat"
-
-    @expose("/")
-    def chat(self):
-        """
-        Chat interface for Airflow Wingman.
-        """
-        return self.render_template(
-            "wingman_chat.html", title="Airflow Wingman", models=MODELS
-        )
-
 
 # Create AppBuilder View
 v_appbuilder_view = WingmanView()
@@ -39,6 +25,8 @@ v_appbuilder_package = {
 
 # Create Plugin
 class WingmanPlugin(AirflowPlugin):
+    """Airflow plugin for Wingman chat interface."""
+
     name = "wingman"
     flask_blueprints = [bp]
     appbuilder_views = [v_appbuilder_package]
