@@ -6,6 +6,8 @@ from flask_appbuilder import BaseView as AppBuilderBaseView, expose
 
 from airflow_wingman.llm_client import LLMClient
 from airflow_wingman.llms_models import MODELS
+from airflow_wingman.notes import INTERFACE_MESSAGES
+from airflow_wingman.prompt_engineering import prepare_messages
 
 
 class WingmanView(AppBuilderBaseView):
@@ -18,7 +20,7 @@ class WingmanView(AppBuilderBaseView):
     def chat(self):
         """Render chat interface."""
         providers = {provider: info["name"] for provider, info in MODELS.items()}
-        return self.render_template("wingman_chat.html", title="Airflow Wingman", models=MODELS, providers=providers)
+        return self.render_template("wingman_chat.html", title="Airflow Wingman", models=MODELS, providers=providers, interface_messages=INTERFACE_MESSAGES)
 
     @expose("/chat", methods=["POST"])
     def chat_completion(self):
@@ -49,10 +51,14 @@ class WingmanView(AppBuilderBaseView):
         if missing:
             raise ValueError(f"Missing required fields: {', '.join(missing)}")
 
+        # Prepare messages with system instruction while maintaining history
+        messages = data["messages"]
+        messages = prepare_messages(messages)
+
         return {
             "provider": data["provider"],
             "model": data["model"],
-            "messages": data["messages"],
+            "messages": messages,
             "api_key": data["api_key"],
             "stream": data.get("stream", False),
             "temperature": data.get("temperature", 0.7),

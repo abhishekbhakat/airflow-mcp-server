@@ -15,9 +15,11 @@
                     <h3 class="panel-title">Airflow Wingman</h3>
                 </div>
                 <div class="alert alert-info" style="margin: 15px;">
-                    <p><strong>Note:</strong> For best results with function/tool calling capabilities, we recommend using models like Claude-3.5 Sonnet or GPT-4o. These models excel at understanding and using complex tools effectively.</p>
+                    <p><strong>{{ interface_messages.model_recommendation.title }}:</strong> {{ interface_messages.model_recommendation.content }}</p>
                     <hr style="margin: 10px 0;">
-                    <p><strong>Security:</strong> For your security, API keys are required for each session and are never stored. If you refresh the page or close the browser, you'll need to enter your API key again. This ensures your API keys remain secure in shared environments.</p>
+                    <p><strong>{{ interface_messages.security_note.title }}:</strong> {{ interface_messages.security_note.content }}</p>
+                    <hr style="margin: 10px 0;">
+                    <p><strong>{{ interface_messages.context_window.title }}:</strong> {{ interface_messages.context_window.content }}</p>
                 </div>
             </div>
         </div>
@@ -104,13 +106,22 @@
                     <!-- Messages will be dynamically added here -->
                 </div>
                 <div class="panel-footer" style="padding: 15px; background-color: white;">
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="message-input" placeholder="Type your message...">
-                        <span class="input-group-btn">
-                            <button class="btn btn-primary" type="button" id="send-button">
-                                <i class="fa fa-paper-plane"></i> Send
+                    <div class="row">
+                        <div class="col-md-2">
+                            <button class="btn btn-default btn-block" type="button" id="refresh-button" title="Start a new chat">
+                                <i class="fa fa-refresh"></i> New Chat
                             </button>
-                        </span>
+                        </div>
+                        <div class="col-md-10">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="message-input" placeholder="Type your message...">
+                                <span class="input-group-btn">
+                                    <button class="btn btn-primary" type="button" id="send-button">
+                                        <i class="fa fa-paper-plane"></i> Send
+                                    </button>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -218,9 +229,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
+    const refreshButton = document.getElementById('refresh-button');
     const chatMessages = document.getElementById('chat-messages');
 
     let currentMessageDiv = null;
+    let messageHistory = [];
+
+    function clearChat() {
+        // Clear the chat messages
+        chatMessages.innerHTML = '';
+        // Reset message history
+        messageHistory = [];
+        // Clear the input field
+        messageInput.value = '';
+        // Enable input if it was disabled
+        messageInput.disabled = false;
+        sendButton.disabled = false;
+    }
 
     function addMessage(content, isUser) {
         const messageDiv = document.createElement('div');
@@ -250,17 +275,14 @@ document.addEventListener('DOMContentLoaded', function() {
         addMessage(message, true);
 
         try {
-            // Create messages array with system message
-            const messages = [
-                {
-                    role: 'system',
-                    content: 'You are a helpful AI assistant integrated into Apache Airflow.'
-                },
-                {
-                    role: 'user',
-                    content: message
-                }
-            ];
+            // Add user message to history
+            messageHistory.push({
+                role: 'user',
+                content: message
+            });
+
+            // Use full message history for the request
+            const messages = [...messageHistory];
 
             // Create assistant message div
             currentMessageDiv = addMessage('', false);
@@ -314,6 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Handle streaming response
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
+            let fullResponse = '';
 
             while (true) {
                 const { value, done } = await reader.read();
@@ -327,10 +350,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         const content = line.slice(6);
                         if (content) {
                             currentMessageDiv.textContent += content;
+                            fullResponse += content;
                             chatMessages.scrollTop = chatMessages.scrollHeight;
                         }
                     }
                 }
+            }
+
+            // Add assistant's response to history
+            if (fullResponse) {
+                messageHistory.push({
+                    role: 'assistant',
+                    content: fullResponse
+                });
             }
         } catch (error) {
             console.error('Error:', error);
@@ -345,6 +377,8 @@ document.addEventListener('DOMContentLoaded', function() {
             sendMessage();
         }
     });
+
+    refreshButton.addEventListener('click', clearChat);
 });
 </script>
 {% endblock %}
