@@ -18,14 +18,18 @@ dependencies = [
     "pyyaml>=6.0.0",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.10",
 ]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 
 [project.urls]
-repository = "https://github.com/abhishekbhakat/airflow-mcp-server"
+GitHub = "https://github.com/abhishekbhakat/airflow-mcp-server"
+Issues = "https://github.com/abhishekbhakat/airflow-mcp-server/issues"
 
 [project.scripts]
 airflow-mcp-server = "airflow_mcp_server.__main__:main"
