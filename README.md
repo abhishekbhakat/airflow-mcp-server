@@ -1,5 +1,11 @@
 # airflow-mcp-server: An MCP Server for controlling Airflow
 
+### Find on Glama
+
+<a href="https://glama.ai/mcp/servers/6gjq9w80xr">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/6gjq9w80xr/badge" />
+</a>
+
 
 ## Overview
 A Model Context Protocol server for controlling Airflow via Airflow APIs.
