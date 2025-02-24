@@ -46,6 +46,7 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/airflow_mcp_server"]
+package-data = {"airflow_mcp_server"= ["*.yaml"]}
 
 [tool.hatch.build.targets.wheel.sources]
 "src/airflow_mcp_server" = "airflow_mcp_server"
