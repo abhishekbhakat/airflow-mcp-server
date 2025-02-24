@@ -27,6 +27,9 @@ license-files = ["LICEN[CS]E*"]
 GitHub = "https://github.com/abhishekbhakat/airflow-mcp-server"
 Issues = "https://github.com/abhishekbhakat/airflow-mcp-server/issues"
 
+[project.entry-points."airflow.plugins"]
+wingman = "airflow_wingman:WingmanPlugin"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
