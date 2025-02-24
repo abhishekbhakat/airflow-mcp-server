@@ -21,7 +21,7 @@
         <div class="col-md-3">
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <h3 class="panel-title">Model Selection</h3>
+                    <h3 class="panel-title">Provider Selection</h3>
                 </div>
                 <div class="panel-body">
                     {% for provider_id, provider in models.items() %}
@@ -29,19 +29,29 @@
                         <h4 class="provider-name">{{ provider.name }}</h4>
                         {% for model in provider.models %}
                         <div class="radio model-option">
-                            <label class="model-label" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ model.description }}">
+                            <label class="model-label" title="{{ model.description }}">
                                 <input type="radio"
                                        name="model"
                                        value="{{ provider_id }}:{{ model.id }}"
                                        {% if model.default %}checked{% endif %}
                                        data-endpoint="{{ provider.endpoint }}"
-                                       data-context-window="{{ model.context_window }}">
+                                       data-context-window="{{ model.context_window }}"
+                                       data-provider="{{ provider_id }}"
+                                       data-model-name="{{ model.name }}">
                                 {{ model.name }}
                             </label>
                         </div>
                         {% endfor %}
                     </div>
                     {% endfor %}
+                </div>
+
+                <!-- Model Name Input -->
+                <div class="panel-body" style="border-top: 1px solid #ddd; padding-top: 15px;">
+                    <div class="form-group">
+                        <label for="modelName">Model Name</label>
+                        <input type="text" class="form-control" id="modelName" placeholder="Enter model name for OpenRouter" disabled>
+                    </div>
                 </div>
 
                 <style>
@@ -155,14 +165,54 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl, {
-            trigger: 'hover',
-            html: true
+    // Add title attributes for tooltips
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+        el.title = el.getAttribute('title') || el.getAttribute('data-bs-original-title');
+    });
+
+    // Handle model selection and model name input
+    const modelNameInput = document.getElementById('modelName');
+    const modelRadios = document.querySelectorAll('input[name="model"]');
+
+    modelRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            const provider = this.value.split(':')[0];  // Get provider from value instead of data attribute
+            const modelName = this.getAttribute('data-model-name');
+            console.log('Selected provider:', provider);
+            console.log('Model name:', modelName);
+            
+            if (provider === 'openrouter') {
+                console.log('Enabling model name input');
+                modelNameInput.disabled = false;
+                modelNameInput.value = '';
+                modelNameInput.placeholder = 'Enter model name for OpenRouter';
+            } else {
+                console.log('Disabling model name input');
+                modelNameInput.disabled = true;
+                modelNameInput.value = modelName;
+            }
         });
     });
+
+    // Set initial state based on default selection
+    const defaultSelected = document.querySelector('input[name="model"]:checked');
+    if (defaultSelected) {
+        const provider = defaultSelected.value.split(':')[0];  // Get provider from value instead of data attribute
+        const modelName = defaultSelected.getAttribute('data-model-name');
+        console.log('Initial provider:', provider);
+        console.log('Initial model name:', modelName);
+        
+        if (provider === 'openrouter') {
+            console.log('Initially enabling model name input');
+            modelNameInput.disabled = false;
+            modelNameInput.value = '';
+            modelNameInput.placeholder = 'Enter model name for OpenRouter';
+        } else {
+            console.log('Initially disabling model name input');
+            modelNameInput.disabled = true;
+            modelNameInput.value = modelName;
+        }
+    }
 
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
