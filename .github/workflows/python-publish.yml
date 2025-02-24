@@ -31,7 +31,6 @@ jobs:
           pip install uv
 
       - name: Build release distributions
-        working-directory: airflow-mcp-server
         run: |
           uv pip install --system build
           python -m build
@@ -40,7 +39,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-dists
-          path: airflow-mcp-server/dist/
+          path: dist/
 
   pypi-publish:
     runs-on: ubuntu-latest

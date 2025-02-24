@@ -2,11 +2,12 @@
 
 
 ## Overview
-A Model Context Protocol server for controlling Airflow via Airflow APIs.
+A [Model Context Protocol](https://modelcontextprotocol.io/) server for controlling Airflow via Airflow APIs.
 
 ## Demo Video
 
 https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
+
 
 ## Setup
 
@@ -29,13 +30,41 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
 }
 ```
 
+### Operation Modes
 
-# Scope
+The server supports two operation modes:
 
-2 different streams in which Airflow MCP Server can be used:
-- Adding Airflow to AI  (_complete access to an Airflow deployment_)
-  - This will enable AI to be able to write DAGs and just do things in a schedule on its own.
-  - Use command `airflow-mcp-server` or `airflow-mcp-server --unsafe`.
-- Adding AI to Airflow (_read-only access using Airflow Plugin_)
-  - This stream can enable Users to be able to get a better understanding about their deployment. Specially in cases where teams have hundreds, if not thousands of dags.
-  - Use command `airflow-mcp-server --safe`.
+- **Safe Mode** (`--safe`): Only allows read-only operations (GET requests). This is useful when you want to prevent any modifications to your Airflow instance.
+- **Unsafe Mode** (`--unsafe`): Allows all operations including modifications. This is the default mode.
+
+To start in safe mode:
+```bash
+airflow-mcp-server --safe
+```
+
+To explicitly start in unsafe mode (though this is default):
+```bash
+airflow-mcp-server --unsafe
+```
+
+### Considerations
+
+The MCP Server expects environment variables to be set:
+- `AIRFLOW_BASE_URL`: The base URL of the Airflow API
+- `AUTH_TOKEN`: The token to use for authorization (_This should be base64 encoded username:password_)
+- `OPENAPI_SPEC`: The path to the OpenAPI spec file (_Optional_) (_defaults to latest stable release_)
+
+*Currently, only Basic Auth is supported.*
+
+**Page Limit**
+
+The default is 100 items, but you can change it using `maximum_page_limit` option in [api] section in the `airflow.cfg` file.
+
+## Tasks
+
+- [x] First API
+- [x] Parse OpenAPI Spec
+- [x] Safe/Unsafe mode implementation
+- [ ] Parse proper description with list_tools.
+- [ ] Airflow config fetch (_specifically for page limit_)
+- [ ] Env variables optional (_env variables might not be ideal for airflow plugins_)
