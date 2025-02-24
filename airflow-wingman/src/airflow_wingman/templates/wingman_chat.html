@@ -1,5 +1,10 @@
 {% extends "appbuilder/base.html" %}
 
+{% block head_meta %}
+    {{ super() }}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- Banner -->
@@ -237,8 +242,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const provider = selectedModel.getAttribute('data-provider');
-        const modelId = selectedModel.value.split(':')[1];
+        const [provider, modelId] = selectedModel.value.split(':');
         const modelName = provider === 'openrouter' ? modelNameInput.value : modelId;
 
         // Clear input and add user message
@@ -268,11 +272,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Debug log the request
+            const requestData = {
+                provider: provider,
+                model: modelName,
+                messages: messages,
+                api_key: apiKey,
+                stream: true,
+                temperature: 0.7
+            };
+            console.log('Sending request:', {...requestData, api_key: '***'});
+
+            // Get CSRF token
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            if (!csrfToken) {
+                throw new Error('CSRF token not found. Please refresh the page.');
+            }
+
             // Send request
             const response = await fetch('/wingman/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
                     provider: provider,
