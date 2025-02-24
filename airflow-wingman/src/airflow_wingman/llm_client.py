@@ -22,7 +22,7 @@ class LLMClient:
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
             default_headers={
-                "HTTP-Referer": "http://localhost:8080",  # Required by OpenRouter
+                "HTTP-Referer": "Airflow Wingman",  # Required by OpenRouter
                 "X-Title": "Airflow Wingman",  # Required by OpenRouter
             },
         )
