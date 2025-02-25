@@ -31,9 +31,9 @@ def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, spec_path
     # Read environment variables with proper precedence
     # Environment variables take precedence over CLI arguments
     config_base_url = os.environ.get("AIRFLOW_BASE_URL") or base_url
-    config_spec_path = os.environ.get("AIRFLOW_SPEC_PATH") or spec_path
-    config_auth_token = os.environ.get("AIRFLOW_AUTH_TOKEN") or auth_token
-    config_cookie = os.environ.get("AIRFLOW_COOKIE") or cookie
+    config_spec_path = os.environ.get("OPENAPI_SPEC") or spec_path
+    config_auth_token = os.environ.get("AUTH_TOKEN") or auth_token
+    config_cookie = os.environ.get("COOKIE") or cookie
 
     # Initialize configuration
     try:
