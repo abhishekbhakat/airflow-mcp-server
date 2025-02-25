@@ -81,6 +81,7 @@ The default is 100 items, but you can change it using `maximum_page_limit` optio
 - [x] First API
 - [x] Parse OpenAPI Spec
 - [x] Safe/Unsafe mode implementation
+- [x] Allow session auth
 - [ ] Parse proper description with list_tools.
 - [ ] Airflow config fetch (_specifically for page limit_)
 - [ ] Env variables optional (_env variables might not be ideal for airflow plugins_)
