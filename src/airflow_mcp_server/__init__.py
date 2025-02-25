@@ -22,12 +22,15 @@ def main(verbose: int, safe: bool, unsafe: bool) -> None:
 
     logging.basicConfig(level=logging_level, stream=sys.stderr)
 
+    # Determine server mode with proper precedence
     if safe and unsafe:
+        # CLI argument validation
         raise click.UsageError("Options --safe and --unsafe are mutually exclusive")
-
-    if safe:
+    elif safe:
+        # CLI argument for safe mode
         asyncio.run(serve_safe())
-    else:  # Default to unsafe mode
+    else:
+        # Default to unsafe mode
         asyncio.run(serve_unsafe())
 
 
