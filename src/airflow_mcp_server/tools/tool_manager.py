@@ -46,10 +46,12 @@ def _initialize_client() -> AirflowClient:
     # Initialize client with appropriate authentication method
     client_args = {"spec_path": spec_path, "base_url": os.environ["AIRFLOW_BASE_URL"]}
 
-    if has_auth_token:
-        client_args["auth_token"] = os.environ["AUTH_TOKEN"]
-    elif has_cookie:
+    # Apply cookie auth first if available (highest precedence)
+    if has_cookie:
         client_args["cookie"] = os.environ["COOKIE"]
+    # Otherwise use auth token if available
+    elif has_auth_token:
+        client_args["auth_token"] = os.environ["AUTH_TOKEN"]
 
     return AirflowClient(**client_args)
 

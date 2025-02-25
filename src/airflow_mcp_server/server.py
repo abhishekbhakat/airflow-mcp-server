@@ -21,7 +21,17 @@ logger = logging.getLogger(__name__)
 
 
 async def serve() -> None:
-    """Start MCP server."""
+    """Start MCP server.
+
+    Configuration precedence:
+    1. Environment variables (highest)
+    2. Command line arguments (if applicable)
+    3. Default values (lowest)
+
+    For authentication:
+    1. Cookie authentication (highest)
+    2. Auth token authentication (secondary)
+    """
     # Check for AIRFLOW_BASE_URL which is always required
     if "AIRFLOW_BASE_URL" not in os.environ:
         raise ValueError("Missing required environment variable: AIRFLOW_BASE_URL")

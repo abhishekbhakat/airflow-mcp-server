@@ -102,11 +102,11 @@ class AirflowClient:
             self.base_url = base_url.rstrip("/")
             self.headers = {"Accept": "application/json"}
 
-            # Set authentication header based on what was provided
-            if auth_token:
-                self.headers["Authorization"] = f"Basic {auth_token}"
-            elif cookie:
+            # Set authentication header based on precedence (cookie > auth_token)
+            if cookie:
                 self.headers["Cookie"] = cookie
+            elif auth_token:
+                self.headers["Authorization"] = f"Basic {auth_token}"
 
         except Exception as e:
             logger.error("Failed to initialize AirflowClient: %s", e)
