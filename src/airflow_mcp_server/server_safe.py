@@ -13,9 +13,16 @@ logger = logging.getLogger(__name__)
 
 async def serve() -> None:
     """Start MCP server in safe mode (read-only operations)."""
-    required_vars = ["AIRFLOW_BASE_URL", "AUTH_TOKEN"]
-    if not all(var in os.environ for var in required_vars):
-        raise ValueError(f"Missing required environment variables: {required_vars}")
+    # Check for AIRFLOW_BASE_URL which is always required
+    if "AIRFLOW_BASE_URL" not in os.environ:
+        raise ValueError("Missing required environment variable: AIRFLOW_BASE_URL")
+
+    # Check for either AUTH_TOKEN or COOKIE
+    has_auth_token = "AUTH_TOKEN" in os.environ
+    has_cookie = "COOKIE" in os.environ
+
+    if not has_auth_token and not has_cookie:
+        raise ValueError("Either AUTH_TOKEN or COOKIE environment variable must be provided")
 
     server = Server("airflow-mcp-server-safe")
 

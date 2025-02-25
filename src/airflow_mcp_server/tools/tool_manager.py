@@ -32,12 +32,26 @@ def _initialize_client() -> AirflowClient:
         except Exception as e:
             raise ValueError("Default OpenAPI spec not found in package resources") from e
 
-    required_vars = ["AIRFLOW_BASE_URL", "AUTH_TOKEN"]
-    missing_vars = [var for var in required_vars if var not in os.environ]
-    if missing_vars:
-        raise ValueError(f"Missing required environment variables: {missing_vars}")
+    # Check for base URL
+    if "AIRFLOW_BASE_URL" not in os.environ:
+        raise ValueError("Missing required environment variable: AIRFLOW_BASE_URL")
 
-    return AirflowClient(spec_path=spec_path, base_url=os.environ["AIRFLOW_BASE_URL"], auth_token=os.environ["AUTH_TOKEN"])
+    # Check for either AUTH_TOKEN or COOKIE
+    has_auth_token = "AUTH_TOKEN" in os.environ
+    has_cookie = "COOKIE" in os.environ
+
+    if not has_auth_token and not has_cookie:
+        raise ValueError("Either AUTH_TOKEN or COOKIE environment variable must be provided")
+
+    # Initialize client with appropriate authentication method
+    client_args = {"spec_path": spec_path, "base_url": os.environ["AIRFLOW_BASE_URL"]}
+
+    if has_auth_token:
+        client_args["auth_token"] = os.environ["AUTH_TOKEN"]
+    elif has_cookie:
+        client_args["cookie"] = os.environ["COOKIE"]
+
+    return AirflowClient(**client_args)
 
 
 async def _initialize_tools() -> None:

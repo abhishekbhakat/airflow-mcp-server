@@ -32,6 +32,31 @@ def test_init_client_initialization(client: AirflowClient) -> None:
     assert isinstance(client.spec, OpenAPI)
     assert client.base_url == "http://localhost:8080/api/v1"
     assert client.headers["Authorization"] == "Basic test-token"
+    assert "Cookie" not in client.headers
+
+
+def test_init_client_with_cookie() -> None:
+    with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
+        spec = yaml.safe_load(f)
+    client = AirflowClient(
+        spec_path=spec,
+        base_url="http://localhost:8080/api/v1",
+        cookie="session=b18e8c5e-92f5-4d1e-a8f2-7c1b62110cae.vmX5kqDq5TdvT9BzTlypMVclAwM",
+    )
+    assert isinstance(client.spec, OpenAPI)
+    assert client.base_url == "http://localhost:8080/api/v1"
+    assert "Authorization" not in client.headers
+    assert client.headers["Cookie"] == "session=b18e8c5e-92f5-4d1e-a8f2-7c1b62110cae.vmX5kqDq5TdvT9BzTlypMVclAwM"
+
+
+def test_init_client_missing_auth() -> None:
+    with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
+        spec = yaml.safe_load(f)
+    with pytest.raises(ValueError, match="Either auth_token or cookie must be provided"):
+        AirflowClient(
+            spec_path=spec,
+            base_url="http://localhost:8080/api/v1",
+        )
 
 
 def test_init_load_spec_from_bytes() -> None:
