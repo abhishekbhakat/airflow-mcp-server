@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 def spec_file():
     """Get content of the v1.yaml spec file."""
-    with resources.files("tests.client").joinpath("v1.yaml").open("rb") as f:
+    with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
         return f.read()
 
 
