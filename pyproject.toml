@@ -52,7 +52,8 @@ build-backend = "hatchling.build"
 exclude = [
     "*",
     "!src/**",
-    "!pyproject.toml"
+    "!pyproject.toml",
+    "!assets/**"
 ]
 
 [tool.hatch.build.targets.wheel]

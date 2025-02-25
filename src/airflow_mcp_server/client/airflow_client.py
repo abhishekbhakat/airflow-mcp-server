@@ -35,18 +35,22 @@ class AirflowClient:
         self,
         spec_path: Path | str | dict | bytes | BinaryIO | TextIO,
         base_url: str,
-        auth_token: str,
+        auth_token: str | None = None,
+        cookie: str | None = None,
     ) -> None:
         """Initialize Airflow client.
 
         Args:
             spec_path: OpenAPI spec as file path, dict, bytes, or file object
             base_url: Base URL for API
-            auth_token: Authentication token
+            auth_token: Authentication token (optional if cookie is provided)
+            cookie: Session cookie (optional if auth_token is provided)
 
         Raises:
-            ValueError: If spec_path is invalid or spec cannot be loaded
+            ValueError: If spec_path is invalid or spec cannot be loaded or if neither auth_token nor cookie is provided
         """
+        if not auth_token and not cookie:
+            raise ValueError("Either auth_token or cookie must be provided")
         try:
             # Load and parse OpenAPI spec
             if isinstance(spec_path, dict):
@@ -96,10 +100,13 @@ class AirflowClient:
 
             # API configuration
             self.base_url = base_url.rstrip("/")
-            self.headers = {
-                "Authorization": f"Basic {auth_token}",
-                "Accept": "application/json",
-            }
+            self.headers = {"Accept": "application/json"}
+
+            # Set authentication header based on precedence (cookie > auth_token)
+            if cookie:
+                self.headers["Cookie"] = cookie
+            elif auth_token:
+                self.headers["Authorization"] = f"Basic {auth_token}"
 
         except Exception as e:
             logger.error("Failed to initialize AirflowClient: %s", e)
