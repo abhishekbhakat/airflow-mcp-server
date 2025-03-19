@@ -31,6 +31,24 @@ def test_parse_operation_basic(parser: OperationParser) -> None:
     assert operation.operation_id == "get_dags"
     assert operation.path == "/dags"
     assert operation.method == "get"
+    assert (
+        operation.description
+        == """List DAGs in the database.
+`dag_id_pattern` can be set to match dags of a specific pattern
+"""
+    )
+    assert isinstance(operation.parameters, dict)
+
+
+def test_parse_operation_with_no_description_but_summary(parser: OperationParser) -> None:
+    """Test parsing operation with no description but summary."""
+    operation = parser.parse_operation("get_connections")
+
+    assert isinstance(operation, OperationDetails)
+    assert operation.operation_id == "get_connections"
+    assert operation.path == "/connections"
+    assert operation.method == "get"
+    assert operation.description == "List connections"
     assert isinstance(operation.parameters, dict)
 
 
