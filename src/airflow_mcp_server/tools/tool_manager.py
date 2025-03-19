@@ -105,7 +105,7 @@ async def get_airflow_tools(config: AirflowConfig, mode: str = "unsafe") -> list
             tools.append(
                 Tool(
                     name=operation_id,
-                    description=tool.operation.operation_id,
+                    description=tool.operation.description,
                     inputSchema=schema,
                 )
             )

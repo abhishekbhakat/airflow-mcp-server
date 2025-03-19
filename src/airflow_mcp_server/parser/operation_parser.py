@@ -20,6 +20,7 @@ class OperationDetails:
     method: str
     parameters: dict[str, Any]
     input_model: type[BaseModel]
+    description: str
 
 
 class OperationParser:
@@ -104,6 +105,7 @@ class OperationParser:
 
                         operation["path"] = path
                         operation["path_item"] = path_item
+                        description = operation.get("description") or operation.get("summary") or operation_id
 
                         parameters = self.extract_parameters(operation)
 
@@ -119,7 +121,7 @@ class OperationParser:
                         # Create unified input model
                         input_model = self._create_input_model(operation_id, parameters, body_schema)
 
-                        return OperationDetails(operation_id=operation_id, path=str(path), method=method, parameters=parameters, input_model=input_model)
+                        return OperationDetails(operation_id=operation_id, path=str(path), method=method, parameters=parameters, description=description, input_model=input_model)
 
             raise ValueError(f"Operation {operation_id} not found in spec")
 
