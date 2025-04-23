@@ -1,6 +1,6 @@
 [project]
 name = "airflow-mcp-server"
-version = "0.5.0"
+version = "0.6.0"
 description = "MCP Server for Airflow"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ dependencies = [
     "aiohttp>=3.11.11",
     "aioresponses>=0.7.7",
     "importlib-resources>=6.5.0",
-    "mcp>=1.2.0",
+    "mcp>=1.6.0",
     "openapi-core>=0.19.4",
     "pydantic>=2.10.5",
     "pyyaml>=6.0.0",
@@ -58,7 +58,6 @@ exclude = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/airflow_mcp_server"]
-package-data = {"airflow_mcp_server"= ["*.yaml"]}
 
 [tool.hatch.build.targets.wheel.sources]
 "src/airflow_mcp_server" = "airflow_mcp_server"
