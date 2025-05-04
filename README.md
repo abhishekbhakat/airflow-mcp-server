@@ -19,25 +19,25 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
 
 ```json
 {
-  "mcpServers": {
-    "airflow-mcp-server": {
-      "command": "uvx",
-      "args": [
-        "airflow-mcp-server"
-      ],
-      "env": {
-        "AIRFLOW_BASE_URL": "http://<host:port>",
-        "AUTH_TOKEN": "<jwt_access_token>"
-      }
+    "mcpServers": {
+        "airflow-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "airflow-mcp-server",
+                "--base-url",
+                "http://localhost:8080",
+                "--auth-token",
+                "<jwt_token>",
+            ]
+        }
     }
-  }
 }
 ```
 
 > **Note:**
-> - Set `AIRFLOW_BASE_URL` to the root Airflow URL (e.g., `http://localhost:8080`).
-> - Do **not** include `/api/v2` in the base URL. The server will automatically fetch the OpenAPI spec from `${AIRFLOW_BASE_URL}/openapi.json`.
-> - Only `AUTH_TOKEN` (JWT) is required for authentication. Cookie and basic auth are no longer supported in Airflow 3.0.
+> - Set `base_url` to the root Airflow URL (e.g., `http://localhost:8080`).
+> - Do **not** include `/api/v2` in the base URL. The server will automatically fetch the OpenAPI spec from `${base_url}/openapi.json`.
+> - Only JWT token is required for authentication. Cookie and basic auth are no longer supported in Airflow 3.0.
 
 ### Operation Modes
 
@@ -57,10 +57,6 @@ airflow-mcp-server --unsafe
 ```
 
 ### Considerations
-
-The MCP Server expects environment variables to be set:
-- `AIRFLOW_BASE_URL`: The root URL of the Airflow instance (e.g., `http://localhost:8080`)
-- `AUTH_TOKEN`: The JWT access token for authentication
 
 **Authentication**
 
