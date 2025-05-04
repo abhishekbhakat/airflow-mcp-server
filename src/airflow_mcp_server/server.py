@@ -3,7 +3,7 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import Prompt, Resource, ResourceTemplate, TextContent, Tool
 
 from airflow_mcp_server.config import AirflowConfig
 from airflow_mcp_server.tools.tool_manager import get_airflow_tools, get_tool
@@ -35,6 +35,24 @@ async def serve(config: AirflowConfig) -> None:
         except Exception as e:
             logger.error("Failed to list tools: %s", e)
             raise
+
+    @server.list_resources()
+    async def list_resources() -> list[Resource]:
+        """List available resources (returns empty list)."""
+        logger.info("Resources list requested - returning empty list")
+        return []
+
+    @server.list_resource_templates()
+    async def list_resource_templates() -> list[ResourceTemplate]:
+        """List available resource templates (returns empty list)."""
+        logger.info("Resource templates list requested - returning empty list")
+        return []
+
+    @server.list_prompts()
+    async def list_prompts() -> list[Prompt]:
+        """List available prompts (returns empty list)."""
+        logger.info("Prompts list requested - returning empty list")
+        return []
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
