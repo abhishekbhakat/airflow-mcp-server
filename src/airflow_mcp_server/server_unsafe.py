@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import anyio
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Prompt, Resource, ResourceTemplate, TextContent, Tool
@@ -8,6 +9,15 @@ from mcp.types import Prompt, Resource, ResourceTemplate, TextContent, Tool
 from airflow_mcp_server.config import AirflowConfig
 from airflow_mcp_server.tools.tool_manager import get_airflow_tools, get_tool
 
+# ===========THIS IS FOR DEBUGGING WITH MCP INSPECTOR===================
+# import sys
+# Configure root logger to stderr
+# logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.StreamHandler(sys.stderr)])
+
+# Disable Uvicorn's default handlers
+# logging.getLogger("uvicorn.error").handlers = []
+# logging.getLogger("uvicorn.access").handlers = []
+# ======================================================================
 logger = logging.getLogger(__name__)
 
 
@@ -58,4 +68,10 @@ async def serve(config: AirflowConfig) -> None:
 
     options = server.create_initialization_options()
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, options, raise_exceptions=True)
+        try:
+            await server.run(read_stream, write_stream, options, raise_exceptions=True)
+        except anyio.BrokenResourceError:
+            logger.error("BrokenResourceError: Stream was closed unexpectedly. Exiting gracefully.")
+        except Exception as e:
+            logger.error(f"Unexpected error in server.run: {e}")
+            raise
