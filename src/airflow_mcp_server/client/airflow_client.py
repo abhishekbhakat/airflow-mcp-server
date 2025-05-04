@@ -1,7 +1,7 @@
 import logging
 import re
 
-import requests
+import httpx
 from jsonschema_path import SchemaPath
 from openapi_core import OpenAPI
 from openapi_core.validation.request.validators import V31RequestValidator
@@ -25,7 +25,7 @@ def convert_dict_keys(d: dict) -> dict:
 
 
 class AirflowClient:
-    """Client for interacting with Airflow API."""
+    """Async client for interacting with Airflow API."""
 
     def __init__(
         self,
@@ -48,12 +48,25 @@ class AirflowClient:
         self.base_url = base_url
         self.auth_token = auth_token
         self.headers = {"Authorization": f"Bearer {self.auth_token}"}
+        self._client: httpx.AsyncClient | None = None
+        self.raw_spec = None
+        self.spec = None
+        self._paths = None
+        self._validator = None
 
-        # Fetch OpenAPI spec from endpoint
+    async def __aenter__(self):
+        self._client = httpx.AsyncClient(headers=self.headers)
+        await self._initialize_spec()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+
+    async def _initialize_spec(self):
         openapi_url = f"{self.base_url.rstrip('/')}/openapi.json"
-        self.raw_spec = self._fetch_openapi_spec(openapi_url)
-
-        # Validate spec has required fields
+        self.raw_spec = await self._fetch_openapi_spec(openapi_url)
         if not isinstance(self.raw_spec, dict):
             raise ValueError("OpenAPI spec must be a dictionary")
         required_fields = ["openapi", "info", "paths"]
@@ -70,10 +83,12 @@ class AirflowClient:
         schema_path = SchemaPath.from_dict(self.raw_spec)
         self._validator = V31RequestValidator(schema_path)
 
-    def _fetch_openapi_spec(self, url: str) -> dict:
+    async def _fetch_openapi_spec(self, url: str) -> dict:
+        if not self._client:
+            self._client = httpx.AsyncClient(headers=self.headers)
         try:
-            response = requests.get(url, headers=self.headers)
+            response = await self._client.get(url)
             response.raise_for_status()
-        except requests.RequestException as e:
+        except httpx.RequestError as e:
             raise ValueError(f"Failed to fetch OpenAPI spec from {url}: {e}")
         return response.json()
