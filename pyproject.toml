@@ -1,6 +1,6 @@
 [project]
 name = "airflow-mcp-server"
-version = "0.6.0"
+version = "0.6.1"
 description = "MCP Server for Airflow"
 readme = "README.md"
 requires-python = ">=3.11"
