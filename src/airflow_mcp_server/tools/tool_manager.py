@@ -57,7 +57,7 @@ async def get_airflow_tools(config: AirflowConfig, mode: str = "unsafe") -> list
         if airflow_version is None:
             raise RuntimeError("Could not determine Airflow version from get_version tool.")
         if parse_version(airflow_version) <= parse_version("3.1.0"):
-            raise RuntimeError(f"Airflow version {airflow_version} is not supported. Requires > 3.1.0.")
+            raise RuntimeError(f"Airflow version {airflow_version} is not supported. Requires >= 3.1.0.")
 
     tools = []
     for operation_id, tool in _tools_cache.items():
