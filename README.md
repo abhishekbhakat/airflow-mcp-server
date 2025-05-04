@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
 
 > **Note:**
 > - Set `AIRFLOW_BASE_URL` to the root Airflow URL (e.g., `http://localhost:8080`).
-> - Do **not** include `/api/v1` in the base URL. The server will automatically fetch the OpenAPI spec from `${AIRFLOW_BASE_URL}/openapi.json`.
+> - Do **not** include `/api/v2` in the base URL. The server will automatically fetch the OpenAPI spec from `${AIRFLOW_BASE_URL}/openapi.json`.
 > - Only `AUTH_TOKEN` (JWT) is required for authentication. Cookie and basic auth are no longer supported in Airflow 3.0.
 
 ### Operation Modes
@@ -72,9 +72,9 @@ The default is 100 items, but you can change it using `maximum_page_limit` optio
 
 ## Tasks
 
-- [ ] Airflow 3 readiness
-- [ ] Parse OpenAPI Spec
+- [x] Airflow 3 readiness
+- [x] Parse OpenAPI Spec
 - [x] Safe/Unsafe mode implementation
-- [ ] Parse proper description with list_tools.
-- [ ] Airflow config fetch (_specifically for page limit_)
+- [x] Parse proper description with list_tools.
+- [x] Airflow config fetch (_specifically for page limit_)
 - [ ] Env variables optional (_env variables might not be ideal for airflow plugins_)
