@@ -1,6 +1,7 @@
 import logging
 
 from mcp.types import Tool
+from packaging.version import parse as parse_version
 
 from airflow_mcp_server.client.airflow_client import AirflowClient
 from airflow_mcp_server.config import AirflowConfig
@@ -10,22 +11,6 @@ from airflow_mcp_server.tools.airflow_tool import AirflowTool
 logger = logging.getLogger(__name__)
 
 _tools_cache: dict[str, AirflowTool] = {}
-
-
-def _initialize_client(config: AirflowConfig) -> AirflowClient:
-    """Initialize Airflow client with configuration.
-
-    Args:
-        config: Configuration object with auth and URL settings
-
-    Returns:
-        AirflowClient instance
-
-    Raises:
-        ValueError: If default spec is not found
-    """
-    # Only use base_url and auth_token
-    return AirflowClient(base_url=config.base_url, auth_token=config.auth_token)
 
 
 async def _initialize_tools(config: AirflowConfig) -> None:
@@ -58,8 +43,21 @@ async def get_airflow_tools(config: AirflowConfig, mode: str = "unsafe") -> list
     Raises:
         ValueError: If initialization fails
     """
+
+    # Version check before returning tools
     if not _tools_cache:
         await _initialize_tools(config)
+
+    # Only check version if get_version tool is present
+    if "get_version" in _tools_cache:
+        version_tool = _tools_cache["get_version"]
+        async with version_tool.client:
+            version_result = await version_tool.run()
+        airflow_version = version_result.get("version")
+        if airflow_version is None:
+            raise RuntimeError("Could not determine Airflow version from get_version tool.")
+        if parse_version(airflow_version) <= parse_version("3.1.0"):
+            raise RuntimeError(f"Airflow version {airflow_version} is not supported. Requires > 3.1.0.")
 
     tools = []
     for operation_id, tool in _tools_cache.items():
