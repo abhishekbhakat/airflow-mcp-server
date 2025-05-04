@@ -15,10 +15,8 @@ from airflow_mcp_server.server_unsafe import serve as serve_unsafe
 @click.option("--safe", "-s", is_flag=True, help="Use only read-only tools")
 @click.option("--unsafe", "-u", is_flag=True, help="Use all tools (default)")
 @click.option("--base-url", help="Airflow API base URL")
-@click.option("--spec-path", help="Path to OpenAPI spec file")
-@click.option("--auth-token", help="Authentication token")
-@click.option("--cookie", help="Session cookie")
-def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, spec_path: str = None, auth_token: str = None, cookie: str = None) -> None:
+@click.option("--auth-token", help="Authentication token (JWT)")
+def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, auth_token: str = None) -> None:
     """MCP server for Airflow"""
     logging_level = logging.WARN
     if verbose == 1:
@@ -29,22 +27,18 @@ def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, spec_path
     logging.basicConfig(level=logging_level, stream=sys.stderr)
 
     # Read environment variables with proper precedence
-    # Environment variables take precedence over CLI arguments
     config_base_url = os.environ.get("AIRFLOW_BASE_URL") or base_url
-    config_spec_path = os.environ.get("OPENAPI_SPEC") or spec_path
     config_auth_token = os.environ.get("AUTH_TOKEN") or auth_token
-    config_cookie = os.environ.get("COOKIE") or cookie
 
     # Initialize configuration
     try:
-        config = AirflowConfig(base_url=config_base_url, spec_path=config_spec_path, auth_token=config_auth_token, cookie=config_cookie)
+        config = AirflowConfig(base_url=config_base_url, auth_token=config_auth_token)
     except ValueError as e:
         click.echo(f"Configuration error: {e}", err=True)
         sys.exit(1)
 
     # Determine server mode with proper precedence
     if safe and unsafe:
-        # CLI argument validation
         raise click.UsageError("Options --safe and --unsafe are mutually exclusive")
     elif safe:
         # CLI argument for safe mode
