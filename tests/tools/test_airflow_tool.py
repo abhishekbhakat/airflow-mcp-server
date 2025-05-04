@@ -1,11 +1,11 @@
 """Tests for AirflowTool."""
 
 import pytest
+from pydantic import ValidationError
+
 from airflow_mcp_server.client.airflow_client import AirflowClient
 from airflow_mcp_server.parser.operation_parser import OperationDetails
 from airflow_mcp_server.tools.airflow_tool import AirflowTool
-from pydantic import ValidationError
-
 from tests.tools.test_models import TestRequestModel
 
 
@@ -41,6 +41,7 @@ def operation_details():
             },
         },
         input_model=model,
+        description="Test operation for AirflowTool",
     )
 
 

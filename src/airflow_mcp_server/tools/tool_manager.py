@@ -29,26 +29,15 @@ def _initialize_client(config: AirflowConfig) -> AirflowClient:
 
 
 async def _initialize_tools(config: AirflowConfig) -> None:
-    """Initialize tools cache with Airflow operations.
-
-    Args:
-        config: Configuration object with auth and URL settings
-
-    Raises:
-        ValueError: If initialization fails
-    """
+    """Initialize tools cache with Airflow operations (async)."""
     global _tools_cache
-
     try:
-        client = _initialize_client(config)
-        # Use the OpenAPI spec dict from the client
-        parser = OperationParser(client.raw_spec)
-
-        # Generate tools for each operation
-        for operation_id in parser.get_operations():
-            operation_details = parser.parse_operation(operation_id)
-            tool = AirflowTool(operation_details, client)
-            _tools_cache[operation_id] = tool
+        async with AirflowClient(base_url=config.base_url, auth_token=config.auth_token) as client:
+            parser = OperationParser(client.raw_spec)
+            for operation_id in parser.get_operations():
+                operation_details = parser.parse_operation(operation_id)
+                tool = AirflowTool(operation_details, client)
+                _tools_cache[operation_id] = tool
 
     except Exception as e:
         logger.error("Failed to initialize tools: %s", e)
