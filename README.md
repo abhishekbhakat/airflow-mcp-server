@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
                 "--base-url",
                 "http://localhost:8080",
                 "--auth-token",
-                "<jwt_token>",
+                "<jwt_token>"
             ]
         }
     }
