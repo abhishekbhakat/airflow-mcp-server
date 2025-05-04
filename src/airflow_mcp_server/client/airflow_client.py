@@ -128,13 +128,17 @@ class AirflowClient:
         """Execute an API operation."""
         if not self._client:
             raise RuntimeError("Client not in async context")
+        # Default all params to empty dict if None
+        path_params = path_params or {}
+        query_params = query_params or {}
+        body = body or {}
         path, method, _ = self._get_operation(operation_id)
         self._validate_path_params(path, path_params)
         if path_params:
             path = path.format(**path_params)
         url = f"{self.base_url.rstrip('/')}{path}"
         request_headers = self.headers.copy()
-        if body is not None:
+        if body:
             request_headers["Content-Type"] = "application/json"
         try:
             response = await self._client.request(
