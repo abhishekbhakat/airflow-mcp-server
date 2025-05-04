@@ -1,5 +1,4 @@
 import logging
-from importlib import resources
 
 from mcp.types import Tool
 
@@ -25,27 +24,8 @@ def _initialize_client(config: AirflowConfig) -> AirflowClient:
     Raises:
         ValueError: If default spec is not found
     """
-    spec_path = config.spec_path
-    if not spec_path:
-        # Fallback to embedded v1.yaml
-        try:
-            with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
-                spec_path = f.name
-                logger.info("OPENAPI_SPEC not set; using embedded v1.yaml from %s", spec_path)
-        except Exception as e:
-            raise ValueError("Default OpenAPI spec not found in package resources") from e
-
-    # Initialize client with appropriate authentication method
-    client_args = {"spec_path": spec_path, "base_url": config.base_url}
-
-    # Apply cookie auth first if available (highest precedence)
-    if config.cookie:
-        client_args["cookie"] = config.cookie
-    # Otherwise use auth token if available
-    elif config.auth_token:
-        client_args["auth_token"] = config.auth_token
-
-    return AirflowClient(**client_args)
+    # Only use base_url and auth_token
+    return AirflowClient(base_url=config.base_url, auth_token=config.auth_token)
 
 
 async def _initialize_tools(config: AirflowConfig) -> None:
@@ -61,11 +41,8 @@ async def _initialize_tools(config: AirflowConfig) -> None:
 
     try:
         client = _initialize_client(config)
-        spec_path = config.spec_path
-        if not spec_path:
-            with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
-                spec_path = f.name
-        parser = OperationParser(spec_path)
+        # Use the OpenAPI spec dict from the client
+        parser = OperationParser(client.raw_spec)
 
         # Generate tools for each operation
         for operation_id in parser.get_operations():

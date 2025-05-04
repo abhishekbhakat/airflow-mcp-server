@@ -1,26 +1,16 @@
-import logging
-from importlib import resources
-from typing import Any
-
+import json
 import pytest
-from airflow_mcp_server.parser.operation_parser import OperationDetails, OperationParser
+from typing import Any
 from pydantic import BaseModel
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+from airflow_mcp_server.parser.operation_parser import OperationDetails, OperationParser
 
 
 @pytest.fixture
-def spec_file():
-    """Get content of the v1.yaml spec file."""
-    with resources.files("airflow_mcp_server.resources").joinpath("v1.yaml").open("rb") as f:
-        return f.read()
-
-
-@pytest.fixture
-def parser(spec_file) -> OperationParser:
-    """Create OperationParser instance."""
-    return OperationParser(spec_path=spec_file)
+def parser() -> OperationParser:
+    """Create OperationParser instance from tests/parser/openapi.json."""
+    with open("tests/parser/openapi.json") as f:
+        spec_dict = json.load(f)
+    return OperationParser(spec_dict)
 
 
 def test_parse_operation_basic(parser: OperationParser) -> None:
@@ -29,14 +19,9 @@ def test_parse_operation_basic(parser: OperationParser) -> None:
 
     assert isinstance(operation, OperationDetails)
     assert operation.operation_id == "get_dags"
-    assert operation.path == "/dags"
+    assert operation.path == "/api/v2/dags"
     assert operation.method == "get"
-    assert (
-        operation.description
-        == """List DAGs in the database.
-`dag_id_pattern` can be set to match dags of a specific pattern
-"""
-    )
+    assert operation.description == "Get all DAGs."
     assert isinstance(operation.parameters, dict)
 
 
@@ -46,9 +31,9 @@ def test_parse_operation_with_no_description_but_summary(parser: OperationParser
 
     assert isinstance(operation, OperationDetails)
     assert operation.operation_id == "get_connections"
-    assert operation.path == "/connections"
+    assert operation.path == "/api/v2/connections"
     assert operation.method == "get"
-    assert operation.description == "List connections"
+    assert operation.description == "Get all connection entries."
     assert isinstance(operation.parameters, dict)
 
 
@@ -56,7 +41,7 @@ def test_parse_operation_with_path_params(parser: OperationParser) -> None:
     """Test parsing operation with path parameters."""
     operation = parser.parse_operation("get_dag")
 
-    assert operation.path == "/dags/{dag_id}"
+    assert operation.path == "/api/v2/dags/{dag_id}"
     assert isinstance(operation.input_model, type(BaseModel))
 
     # Verify path parameter field exists
@@ -83,7 +68,10 @@ def test_parse_operation_with_query_params(parser: OperationParser) -> None:
 
 def test_parse_operation_with_body_params(parser: OperationParser) -> None:
     """Test parsing operation with request body."""
-    operation = parser.parse_operation("post_dag_run")
+    # Find the correct operationId for posting a dag run in the OpenAPI spec
+    # From the spec, the likely operation is under /api/v2/dags/{dag_id}/dagRuns
+    # Let's use "post_dag_run" if it exists, otherwise use the actual operationId
+    operation = parser.parse_operation("trigger_dag_run")
 
     # Verify body fields exist
     fields = operation.input_model.__annotations__
@@ -167,7 +155,7 @@ def test_parse_operation_with_allof_body(parser: OperationParser) -> None:
 
     assert isinstance(operation, OperationDetails)
     assert operation.operation_id == "test_connection"
-    assert operation.path == "/connections/test"
+    assert operation.path == "/api/v2/connections/test"
     assert operation.method == "post"
 
     # Verify input model includes fields from allOf schema
