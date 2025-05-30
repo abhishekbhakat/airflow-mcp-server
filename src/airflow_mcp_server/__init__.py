@@ -24,6 +24,7 @@ def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, auth_toke
     elif verbose >= 2:
         logging_level = logging.DEBUG
 
+    # Logging needs to be in stderr as stdout is reserved for transport stdio
     logging.basicConfig(level=logging_level, stream=sys.stderr)
 
     # Read environment variables with proper precedence
@@ -43,6 +44,9 @@ def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, auth_toke
     elif safe:
         # CLI argument for safe mode
         asyncio.run(serve_safe(config))
+    elif unsafe:
+        # Explicitly requested unsafe mode
+        asyncio.run(serve_unsafe(config))
     else:
         # Default to unsafe mode
         asyncio.run(serve_unsafe(config))

@@ -1,23 +1,12 @@
 import logging
-from typing import Any
-
-import anyio
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import Prompt, Resource, ResourceTemplate, TextContent, Tool
+import httpx
+from fastmcp import FastMCP
+from fastmcp.server.openapi import RouteMap, MCPType
 
 from airflow_mcp_server.config import AirflowConfig
-from airflow_mcp_server.tools.tool_manager import get_airflow_tools, get_tool
+from airflow_mcp_server.resources import add_airflow_resources
+from airflow_mcp_server.prompts import add_airflow_prompts
 
-# ===========THIS IS FOR DEBUGGING WITH MCP INSPECTOR===================
-# import sys
-# Configure root logger to stderr
-# logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.StreamHandler(sys.stderr)])
-
-# Disable Uvicorn's default handlers
-# logging.getLogger("uvicorn.error").handlers = []
-# logging.getLogger("uvicorn.access").handlers = []
-# ======================================================================
 logger = logging.getLogger(__name__)
 
 
@@ -27,51 +16,41 @@ async def serve(config: AirflowConfig) -> None:
     Args:
         config: Configuration object with auth and URL settings
     """
-    server = Server("airflow-mcp-server-unsafe")
+    # Create authenticated HTTP client
+    client = httpx.AsyncClient(
+        base_url=config.base_url,
+        headers={"Authorization": f"Bearer {config.auth_token}"},
+        timeout=30.0
+    )
 
-    @server.list_tools()
-    async def list_tools() -> list[Tool]:
-        try:
-            return await get_airflow_tools(config, mode="unsafe")
-        except Exception as e:
-            logger.error("Failed to list tools: %s", e)
-            raise
+    # Fetch OpenAPI spec
+    try:
+        response = await client.get("/openapi.json")
+        response.raise_for_status()
+        openapi_spec = response.json()
+    except Exception as e:
+        logger.error("Failed to fetch OpenAPI spec: %s", e)
+        await client.aclose()
+        raise
 
-    @server.list_resources()
-    async def list_resources() -> list[Resource]:
-        """List available resources (returns empty list)."""
-        logger.info("Resources list requested - returning empty list")
-        return []
+    # Create FastMCP server with all operations allowed
+    mcp = FastMCP.from_openapi(
+        openapi_spec=openapi_spec,
+        client=client,
+        route_maps=[
+            # Allow all HTTP methods as tools
+            RouteMap(methods=["GET", "POST", "PUT", "DELETE", "PATCH"], mcp_type=MCPType.TOOL),
+        ]
+    )
 
-    @server.list_resource_templates()
-    async def list_resource_templates() -> list[ResourceTemplate]:
-        """List available resource templates (returns empty list)."""
-        logger.info("Resource templates list requested - returning empty list")
-        return []
+    # Add Airflow-specific resources and prompts
+    add_airflow_resources(mcp, config, mode="unsafe")
+    add_airflow_prompts(mcp, mode="unsafe")
 
-    @server.list_prompts()
-    async def list_prompts() -> list[Prompt]:
-        """List available prompts (returns empty list)."""
-        logger.info("Prompts list requested - returning empty list")
-        return []
-
-    @server.call_tool()
-    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
-        try:
-            tool = await get_tool(config, name)
-            async with tool.client:
-                result = await tool.run(body=arguments)
-            return [TextContent(type="text", text=str(result))]
-        except Exception as e:
-            logger.error("Tool execution failed: %s", e)
-            raise
-
-    options = server.create_initialization_options()
-    async with stdio_server() as (read_stream, write_stream):
-        try:
-            await server.run(read_stream, write_stream, options, raise_exceptions=True)
-        except anyio.BrokenResourceError:
-            logger.error("BrokenResourceError: Stream was closed unexpectedly. Exiting gracefully.")
-        except Exception as e:
-            logger.error(f"Unexpected error in server.run: {e}")
-            raise
+    # Run the FastMCP server
+    try:
+        await mcp.run_async()
+    except Exception as e:
+        logger.error("Server error: %s", e)
+        await client.aclose()
+        raise
