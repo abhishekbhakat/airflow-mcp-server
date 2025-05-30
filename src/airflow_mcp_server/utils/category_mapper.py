@@ -18,7 +18,6 @@ def extract_categories_from_openapi(openapi_spec: dict) -> dict[str, list[dict]]
     for path, methods in openapi_spec["paths"].items():
         for method, operation in methods.items():
             if method.upper() in ["GET", "POST", "PUT", "DELETE", "PATCH"]:
-                # Extract tags (categories) from operation
                 tags = operation.get("tags", ["Uncategorized"])
 
                 route_info = {
@@ -30,7 +29,6 @@ def extract_categories_from_openapi(openapi_spec: dict) -> dict[str, list[dict]]
                     "tags": tags,
                 }
 
-                # Add to each category
                 for tag in tags:
                     if tag not in categories:
                         categories[tag] = []
@@ -53,7 +51,6 @@ def get_category_info(categories: dict[str, list[dict]]) -> str:
 
     lines = ["Available Airflow Categories:\n"]
 
-    # Sort categories by tool count (descending)
     sorted_categories = sorted(categories.items(), key=lambda x: len(x[1]), reverse=True)
 
     for category, routes in sorted_categories:
@@ -78,7 +75,6 @@ def get_category_tools_info(category: str, routes: list[dict]) -> str:
     """
     lines = [f"{category} Tools ({len(routes)} available):\n"]
 
-    # Group by method for better organization
     methods_groups = {}
     for route in routes:
         method = route["method"]
@@ -86,7 +82,6 @@ def get_category_tools_info(category: str, routes: list[dict]) -> str:
             methods_groups[method] = []
         methods_groups[method].append(route)
 
-    # Display by method type
     for method in ["GET", "POST", "PUT", "DELETE", "PATCH"]:
         if method in methods_groups:
             lines.append(f"\n{method} Operations:")
@@ -94,7 +89,6 @@ def get_category_tools_info(category: str, routes: list[dict]) -> str:
             for route in methods_groups[method]:
                 operation_id = route["operation_id"]
                 summary = route["summary"] or route["description"] or "No description"
-                # Truncate long summaries
                 if len(summary) > 80:
                     summary = summary[:77] + "..."
                 lines.append(f"  - {operation_id}: {summary}")
@@ -130,7 +124,6 @@ def get_tool_name_from_route(route: dict) -> str:
     if operation_id:
         return operation_id
 
-    # Fallback: generate from path and method
     path = route["path"].replace("/", "_").replace("{", "").replace("}", "")
     method = route["method"].lower()
     return f"{method}{path}"

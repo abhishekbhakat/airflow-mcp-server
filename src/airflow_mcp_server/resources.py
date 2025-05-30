@@ -17,5 +17,3 @@ def add_airflow_resources(mcp: FastMCP, config: AirflowConfig, mode: str = "safe
         config: Airflow configuration
         mode: Server mode ("safe" or "unsafe")
     """
-
-    # No resources - return empty list

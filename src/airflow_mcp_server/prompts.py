@@ -10,5 +10,4 @@ def add_airflow_prompts(mcp: FastMCP, mode: str = "safe") -> None:
         mcp: FastMCP server instance
         mode: Server mode ("safe" or "unsafe")
     """
-    # No prompts - return empty list
     pass
