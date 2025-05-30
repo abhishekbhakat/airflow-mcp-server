@@ -56,6 +56,18 @@ To explicitly start in unsafe mode (though this is default):
 airflow-mcp-server --unsafe
 ```
 
+### Tool Discovery Modes
+
+The server supports two tool discovery approaches:
+
+- **Hierarchical Discovery** (default): Tools are organized by categories (DAGs, Tasks, Connections, etc.). Browse categories first, then select specific tools. More manageable for large APIs.
+- **Static Tools** (`--static-tools`): All tools available immediately. Better for programmatic access but can be overwhelming.
+
+To use static tools:
+```bash
+airflow-mcp-server --static-tools
+```
+
 ### Considerations
 
 **Authentication**

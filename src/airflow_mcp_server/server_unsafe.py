@@ -1,77 +1,54 @@
 import logging
-from typing import Any
 
-import anyio
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import Prompt, Resource, ResourceTemplate, TextContent, Tool
+import httpx
+from fastmcp import FastMCP
+from fastmcp.server.openapi import MCPType, RouteMap
 
 from airflow_mcp_server.config import AirflowConfig
-from airflow_mcp_server.tools.tool_manager import get_airflow_tools, get_tool
+from airflow_mcp_server.hierarchical_manager import HierarchicalToolManager
+from airflow_mcp_server.prompts import add_airflow_prompts
+from airflow_mcp_server.resources import add_airflow_resources
 
-# ===========THIS IS FOR DEBUGGING WITH MCP INSPECTOR===================
-# import sys
-# Configure root logger to stderr
-# logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.StreamHandler(sys.stderr)])
-
-# Disable Uvicorn's default handlers
-# logging.getLogger("uvicorn.error").handlers = []
-# logging.getLogger("uvicorn.access").handlers = []
-# ======================================================================
 logger = logging.getLogger(__name__)
 
 
-async def serve(config: AirflowConfig) -> None:
+async def serve(config: AirflowConfig, static_tools: bool = False) -> None:
     """Start MCP server in unsafe mode (all operations).
 
     Args:
         config: Configuration object with auth and URL settings
+        static_tools: If True, use static tools instead of hierarchical discovery
     """
-    server = Server("airflow-mcp-server-unsafe")
+    client = httpx.AsyncClient(base_url=config.base_url, headers={"Authorization": f"Bearer {config.auth_token}"}, timeout=30.0)
 
-    @server.list_tools()
-    async def list_tools() -> list[Tool]:
-        try:
-            return await get_airflow_tools(config, mode="unsafe")
-        except Exception as e:
-            logger.error("Failed to list tools: %s", e)
-            raise
+    try:
+        response = await client.get("/openapi.json")
+        response.raise_for_status()
+        openapi_spec = response.json()
+    except Exception as e:
+        logger.error("Failed to fetch OpenAPI spec: %s", e)
+        await client.aclose()
+        raise
 
-    @server.list_resources()
-    async def list_resources() -> list[Resource]:
-        """List available resources (returns empty list)."""
-        logger.info("Resources list requested - returning empty list")
-        return []
+    if static_tools:
+        route_maps = [RouteMap(methods=["GET", "POST", "PUT", "DELETE", "PATCH"], mcp_type=MCPType.TOOL)]
+        mcp = FastMCP.from_openapi(openapi_spec=openapi_spec, client=client, name="Airflow MCP Server (Unsafe Mode - Static Tools)", route_maps=route_maps)
+    else:
+        mcp = FastMCP("Airflow MCP Server (Unsafe Mode)")
 
-    @server.list_resource_templates()
-    async def list_resource_templates() -> list[ResourceTemplate]:
-        """List available resource templates (returns empty list)."""
-        logger.info("Resource templates list requested - returning empty list")
-        return []
+        _ = HierarchicalToolManager(
+            mcp=mcp,
+            openapi_spec=openapi_spec,
+            client=client,
+            allowed_methods={"GET", "POST", "PUT", "DELETE", "PATCH"},
+        )
 
-    @server.list_prompts()
-    async def list_prompts() -> list[Prompt]:
-        """List available prompts (returns empty list)."""
-        logger.info("Prompts list requested - returning empty list")
-        return []
+    add_airflow_resources(mcp, config, mode="unsafe")
+    add_airflow_prompts(mcp, mode="unsafe")
 
-    @server.call_tool()
-    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
-        try:
-            tool = await get_tool(config, name)
-            async with tool.client:
-                result = await tool.run(body=arguments)
-            return [TextContent(type="text", text=str(result))]
-        except Exception as e:
-            logger.error("Tool execution failed: %s", e)
-            raise
-
-    options = server.create_initialization_options()
-    async with stdio_server() as (read_stream, write_stream):
-        try:
-            await server.run(read_stream, write_stream, options, raise_exceptions=True)
-        except anyio.BrokenResourceError:
-            logger.error("BrokenResourceError: Stream was closed unexpectedly. Exiting gracefully.")
-        except Exception as e:
-            logger.error(f"Unexpected error in server.run: {e}")
-            raise
+    try:
+        await mcp.run_async()
+    except Exception as e:
+        logger.error("Server error: %s", e)
+        await client.aclose()
+        raise

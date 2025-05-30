@@ -14,9 +14,10 @@ from airflow_mcp_server.server_unsafe import serve as serve_unsafe
 @click.option("-v", "--verbose", count=True, help="Increase verbosity")
 @click.option("--safe", "-s", is_flag=True, help="Use only read-only tools")
 @click.option("--unsafe", "-u", is_flag=True, help="Use all tools (default)")
+@click.option("--static-tools", is_flag=True, help="Use static tools instead of hierarchical discovery")
 @click.option("--base-url", help="Airflow API base URL")
 @click.option("--auth-token", help="Authentication token (JWT)")
-def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, auth_token: str = None) -> None:
+def main(verbose: int, safe: bool, unsafe: bool, static_tools: bool, base_url: str = None, auth_token: str = None) -> None:
     """MCP server for Airflow"""
     logging_level = logging.WARN
     if verbose == 1:
@@ -26,26 +27,23 @@ def main(verbose: int, safe: bool, unsafe: bool, base_url: str = None, auth_toke
 
     logging.basicConfig(level=logging_level, stream=sys.stderr)
 
-    # Read environment variables with proper precedence
     config_base_url = os.environ.get("AIRFLOW_BASE_URL") or base_url
     config_auth_token = os.environ.get("AUTH_TOKEN") or auth_token
 
-    # Initialize configuration
     try:
         config = AirflowConfig(base_url=config_base_url, auth_token=config_auth_token)
     except ValueError as e:
         click.echo(f"Configuration error: {e}", err=True)
         sys.exit(1)
 
-    # Determine server mode with proper precedence
     if safe and unsafe:
         raise click.UsageError("Options --safe and --unsafe are mutually exclusive")
     elif safe:
-        # CLI argument for safe mode
-        asyncio.run(serve_safe(config))
+        asyncio.run(serve_safe(config, static_tools=static_tools))
+    elif unsafe:
+        asyncio.run(serve_unsafe(config, static_tools=static_tools))
     else:
-        # Default to unsafe mode
-        asyncio.run(serve_unsafe(config))
+        asyncio.run(serve_unsafe(config, static_tools=static_tools))
 
 
 if __name__ == "__main__":
