@@ -4,15 +4,17 @@ import pytest
 
 
 @pytest.fixture
-def mock_spec_file():
-    """Mock OpenAPI spec file for testing."""
-    mock_spec = {
+def sample_openapi_spec():
+    """Sample OpenAPI spec for testing across multiple test files."""
+    return {
         "openapi": "3.0.0",
         "info": {"title": "Airflow API", "version": "1.0.0"},
         "paths": {
             "/api/v1/dags": {
                 "get": {
                     "operationId": "get_dags",
+                    "summary": "Get all DAGs",
+                    "tags": ["DAGs"],
                     "responses": {
                         "200": {
                             "description": "List of DAGs",
@@ -21,38 +23,9 @@ def mock_spec_file():
                             },
                         }
                     },
-                }
-            },
-            "/api/v1/dags/{dag_id}": {
-                "get": {
-                    "operationId": "get_dag",
-                    "parameters": [{"name": "dag_id", "in": "path", "required": True, "schema": {"type": "string"}}],
-                    "responses": {"200": {"description": "Successful response", "content": {"application/json": {"schema": {"type": "object", "properties": {"dag_id": {"type": "string"}}}}}}},
                 },
-                "post": {
-                    "operationId": "post_dag_run",
-                    "parameters": [{"name": "dag_id", "in": "path", "required": True, "schema": {"type": "string"}}],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "conf": {"type": "object"},
-                                        "dag_run_id": {"type": "string"},
-                                    },
-                                }
-                            }
-                        }
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "Successful response",
-                            "content": {"application/json": {"schema": {"type": "object", "properties": {"dag_run_id": {"type": "string"}, "state": {"type": "string"}}}}},
-                        }
-                    },
-                },
+                "post": {"operationId": "create_dag", "summary": "Create a DAG", "tags": ["DAGs"], "responses": {"201": {"description": "Created"}}},
             },
+            "/api/v1/connections": {"get": {"operationId": "get_connections", "summary": "Get connections", "tags": ["Connections"], "responses": {"200": {"description": "Success"}}}},
         },
     }
-    return mock_spec

@@ -1,6 +1,7 @@
 """Airflow-specific resources for MCP server."""
 
 import logging
+
 from fastmcp import FastMCP
 
 from airflow_mcp_server.config import AirflowConfig

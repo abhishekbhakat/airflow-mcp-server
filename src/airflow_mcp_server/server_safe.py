@@ -1,11 +1,12 @@
 import logging
+
 import httpx
 from fastmcp import FastMCP
-from fastmcp.server.openapi import RouteMap, MCPType
 
 from airflow_mcp_server.config import AirflowConfig
-from airflow_mcp_server.resources import add_airflow_resources
+from airflow_mcp_server.hierarchical_manager import HierarchicalToolManager
 from airflow_mcp_server.prompts import add_airflow_prompts
+from airflow_mcp_server.resources import add_airflow_resources
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,7 @@ async def serve(config: AirflowConfig) -> None:
         config: Configuration object with auth and URL settings
     """
     # Create authenticated HTTP client
-    client = httpx.AsyncClient(
-        base_url=config.base_url,
-        headers={"Authorization": f"Bearer {config.auth_token}"},
-        timeout=30.0
-    )
+    client = httpx.AsyncClient(base_url=config.base_url, headers={"Authorization": f"Bearer {config.auth_token}"}, timeout=30.0)
 
     # Fetch OpenAPI spec
     try:
@@ -33,22 +30,20 @@ async def serve(config: AirflowConfig) -> None:
         await client.aclose()
         raise
 
-    # Create FastMCP server with safe mode (GET operations only)
-    mcp = FastMCP.from_openapi(
+    # Create FastMCP server without auto-generated tools (we'll use hierarchical manager)
+    mcp = FastMCP("Airflow MCP Server (Safe Mode)")
+
+    # Initialize hierarchical tool manager with safe mode (GET only)
+    _ = HierarchicalToolManager(
+        mcp=mcp,
         openapi_spec=openapi_spec,
         client=client,
-        route_maps=[
-            # Only allow GET operations in safe mode
-            RouteMap(methods=["GET"], mcp_type=MCPType.TOOL),
-            # Exclude all other methods
-            RouteMap(methods=["POST", "PUT", "DELETE", "PATCH"], mcp_type=MCPType.EXCLUDE),
-        ]
+        allowed_methods={"GET"},  # Safe mode: read-only operations
     )
 
     # Add Airflow-specific resources and prompts
     add_airflow_resources(mcp, config, mode="safe")
     add_airflow_prompts(mcp, mode="safe")
-
 
     # Run the FastMCP server
     try:

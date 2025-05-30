@@ -1,11 +1,12 @@
 import logging
+
 import httpx
 from fastmcp import FastMCP
-from fastmcp.server.openapi import RouteMap, MCPType
 
 from airflow_mcp_server.config import AirflowConfig
-from airflow_mcp_server.resources import add_airflow_resources
+from airflow_mcp_server.hierarchical_manager import HierarchicalToolManager
 from airflow_mcp_server.prompts import add_airflow_prompts
+from airflow_mcp_server.resources import add_airflow_resources
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,7 @@ async def serve(config: AirflowConfig) -> None:
         config: Configuration object with auth and URL settings
     """
     # Create authenticated HTTP client
-    client = httpx.AsyncClient(
-        base_url=config.base_url,
-        headers={"Authorization": f"Bearer {config.auth_token}"},
-        timeout=30.0
-    )
+    client = httpx.AsyncClient(base_url=config.base_url, headers={"Authorization": f"Bearer {config.auth_token}"}, timeout=30.0)
 
     # Fetch OpenAPI spec
     try:
@@ -33,14 +30,15 @@ async def serve(config: AirflowConfig) -> None:
         await client.aclose()
         raise
 
-    # Create FastMCP server with all operations allowed
-    mcp = FastMCP.from_openapi(
+    # Create FastMCP server without auto-generated tools (we'll use hierarchical manager)
+    mcp = FastMCP("Airflow MCP Server (Unsafe Mode)")
+
+    # Initialize hierarchical tool manager with all methods allowed
+    _ = HierarchicalToolManager(
+        mcp=mcp,
         openapi_spec=openapi_spec,
         client=client,
-        route_maps=[
-            # Allow all HTTP methods as tools
-            RouteMap(methods=["GET", "POST", "PUT", "DELETE", "PATCH"], mcp_type=MCPType.TOOL),
-        ]
+        allowed_methods={"GET", "POST", "PUT", "DELETE", "PATCH"},  # All operations
     )
 
     # Add Airflow-specific resources and prompts
