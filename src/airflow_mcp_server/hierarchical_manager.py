@@ -3,7 +3,7 @@
 import logging
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.server.openapi import MCPType, RouteMap
 
 from .utils.category_mapper import extract_categories_from_openapi, filter_routes_by_methods, get_category_info, get_category_tools_info
@@ -121,13 +121,22 @@ class HierarchicalToolManager:
             return self.get_categories_info()
 
         @self.mcp.tool()
-        def select_category(category: str) -> str:
+        async def select_category(category: str, ctx: Context) -> str:
             """Switch to tools for specific category.
 
             Args:
                 category: Name of the category to explore
             """
-            return self.switch_to_category(category)
+            result = self.switch_to_category(category)
+
+            # Send notification to refresh tool list
+            try:
+                await ctx.session.send_tool_list_changed()
+                logger.info(f"Sent tools/list_changed notification after selecting category: {category}")
+            except Exception as e:
+                logger.warning(f"Failed to send tool list notification: {e}")
+
+            return result
 
         @self.mcp.tool()
         def get_current_category() -> str:
