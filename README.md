@@ -17,6 +17,7 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
 
 ### Usage with Claude Desktop
 
+#### Stdio Transport (Default)
 ```json
 {
     "mcpServers": {
@@ -34,10 +35,49 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
 }
 ```
 
+#### HTTP Transport
+```json
+{
+    "mcpServers": {
+        "airflow-mcp-server-http": {
+            "command": "uvx",
+            "args": [
+                "airflow-mcp-server",
+                "--http",
+                "--port",
+                "3000",
+                "--base-url",
+                "http://localhost:8080",
+                "--auth-token",
+                "<jwt_token>"
+            ]
+        }
+    }
+}
+```
+
 > **Note:**
 > - Set `base_url` to the root Airflow URL (e.g., `http://localhost:8080`).
 > - Do **not** include `/api/v2` in the base URL. The server will automatically fetch the OpenAPI spec from `${base_url}/openapi.json`.
 > - Only JWT token is required for authentication. Cookie and basic auth are no longer supported in Airflow 3.0.
+
+### Transport Options
+
+The server supports multiple transport protocols:
+
+#### Stdio Transport (Default)
+Standard input/output transport for direct process communication:
+```bash
+airflow-mcp-server --safe --base-url http://localhost:8080 --auth-token <jwt>
+```
+
+#### HTTP Transport
+Uses Streamable HTTP for better scalability and web compatibility:
+```bash
+airflow-mcp-server --safe --http --port 3000 --base-url http://localhost:8080 --auth-token <jwt>
+```
+
+> **Note:** SSE transport is deprecated. Use `--http` for new deployments as it provides better bidirectional communication and is the recommended approach by FastMCP.
 
 ### Operation Modes
 
@@ -68,6 +108,28 @@ To use static tools:
 airflow-mcp-server --static-tools
 ```
 
+### Command Line Options
+
+```bash
+Usage: airflow-mcp-server [OPTIONS]
+
+  MCP server for Airflow
+
+Options:
+  -v, --verbose      Increase verbosity
+  -s, --safe         Use only read-only tools
+  -u, --unsafe       Use all tools (default)
+  --static-tools     Use static tools instead of hierarchical discovery
+  --base-url TEXT    Airflow API base URL
+  --auth-token TEXT  Authentication token (JWT)
+  --http             Use HTTP (Streamable HTTP) transport instead of stdio
+  --sse              Use Server-Sent Events transport (deprecated, use --http
+                     instead)
+  --port INTEGER     Port to run HTTP/SSE server on (default: 3000)
+  --host TEXT        Host to bind HTTP/SSE server to (default: localhost)
+  --help             Show this message and exit.
+```
+
 ### Considerations
 
 **Authentication**
@@ -78,6 +140,12 @@ airflow-mcp-server --static-tools
 
 The default is 100 items, but you can change it using `maximum_page_limit` option in [api] section in the `airflow.cfg` file.
 
+**Transport Selection**
+
+- Use **stdio** transport for direct process communication (default)
+- Use **HTTP** transport for web deployments, multiple clients, or when you need better scalability
+- Avoid **SSE** transport as it's deprecated in favor of HTTP transport
+
 ## Tasks
 
 - [x] Airflow 3 readiness
@@ -85,4 +153,5 @@ The default is 100 items, but you can change it using `maximum_page_limit` optio
 - [x] Safe/Unsafe mode implementation
 - [x] Parse proper description with list_tools.
 - [x] Airflow config fetch (_specifically for page limit_)
+- [x] HTTP/SSE transport support
 - [ ] Env variables optional (_env variables might not be ideal for airflow plugins_)
