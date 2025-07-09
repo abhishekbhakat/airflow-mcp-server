@@ -176,6 +176,7 @@ project_resources/
 ._*.py
 ._.repo_ignore
 .repo_ignore
+.claude/
 
 # Ruff
 .ruff_cache/
