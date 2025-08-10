@@ -33,10 +33,9 @@ wheels = [
 
 [[package]]
 name = "airflow-mcp-plugin"
-version = "0.1.1"
+version = "0.1.3"
 source = { editable = "." }
 dependencies = [
-    { name = "airflow-mcp-server" },
     { name = "apache-airflow" },
     { name = "fastmcp" },
     { name = "httpx" },
@@ -44,24 +43,9 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "airflow-mcp-server", specifier = ">=0.8.0" },
     { name = "apache-airflow", specifier = ">=3.0.0" },
     { name = "fastmcp", specifier = ">=2.5.2" },
     { name = "httpx", specifier = ">=0.28.1" },
-]
-
-[[package]]
-name = "airflow-mcp-server"
-version = "0.8.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "fastmcp" },
-    { name = "httpx" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/22/01/2cd565d728fef2070f05ca69ef979cf4f776b3bed8a7a8a8ed40153cd3d3/airflow_mcp_server-0.8.0.tar.gz", hash = "sha256:3dad8af4a135bf1ff55d9a2da1c250f33fa597f426af6dcebf91da0cd02205e9", size = 4171835, upload-time = "2025-08-10T13:28:14.957Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/47/9b3af9b7cb37d481e8d268e083e3cb4aba6c317442da3824dc733034f9f9/airflow_mcp_server-0.8.0-py3-none-any.whl", hash = "sha256:60fb42644048d87bb2fe1d3540fd6838776082c741476d9b1662b0d8a1d817d0", size = 13677, upload-time = "2025-08-10T13:28:13.311Z" },
 ]
 
 [[package]]

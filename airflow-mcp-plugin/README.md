@@ -20,6 +20,21 @@ Deploy:
 - Install into the Airflow webserver container environment (Docker/Compose/Helm)
 - Restart the webserver; Airflow auto-loads the plugin via entry point
 
+Config:
+
+```json
+{
+  "mcpServers": {
+    "airflow-mcp-server": {
+      "type": "sse",
+      "url": "http://localhost:8000/mcp/",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      }
+    }
+  }
+}
+```
 Use (stateless):
 - Endpoint: `http(s)://<airflow-host>/mcp`
 - Every request must include header: `Authorization: Bearer <access-token>`

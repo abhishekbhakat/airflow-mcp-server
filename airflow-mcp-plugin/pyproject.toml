@@ -1,6 +1,6 @@
 [project]
 name = "airflow-mcp-plugin"
-version = "0.1.1"
+version = "0.1.2"
 description = "Apache Airflow 3 plugin that mounts airflow-mcp-server as a Streamable HTTP endpoint at /mcp"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,7 +18,6 @@ dependencies = [
   "apache-airflow>=3.0.0",
   "fastmcp>=2.5.2",
   "httpx>=0.28.1",
-  "airflow-mcp-server>=0.8.1",
 ]
 
 license = "MIT"

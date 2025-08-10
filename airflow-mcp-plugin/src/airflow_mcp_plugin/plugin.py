@@ -5,9 +5,6 @@ import logging
 
 import httpx
 from airflow.plugins_manager import AirflowPlugin
-from airflow_mcp_server.config import AirflowConfig
-from airflow_mcp_server.prompts import add_airflow_prompts
-from airflow_mcp_server.resources import add_airflow_resources
 from fastmcp import FastMCP
 from fastmcp.server.openapi import MCPType, RouteMap
 from starlette.applications import Starlette
@@ -93,19 +90,24 @@ class StatelessMCPMount:
             route_maps=route_maps,
         )
 
-        config = AirflowConfig(base_url=base_url, auth_token=token)
-        mode_str = "unsafe" if is_unsafe else "safe"
-        add_airflow_resources(mcp, config, mode=mode_str)
-        add_airflow_prompts(mcp, mode=mode_str)
-
         mcp_app = mcp.http_app(path=self._path, stateless_http=True)
 
         return mcp_app
 
     async def __call__(self, scope, receive, send):
+        # Normalize empty subpath from parent mount (e.g., '/mcp' -> '/')
+        if not scope.get("path"):
+            scope = dict(scope)
+            scope["path"] = "/"
+
         request = Request(scope, receive=receive)
         app = await self._build_stateless_app(request)
-        await app(scope, receive, send)
+        # Ensure FastMCP's lifespan runs for each request since the parent app won't manage it
+        if hasattr(app, "router") and hasattr(app.router, "lifespan_context"):
+            async with app.router.lifespan_context(app):
+                await app(scope, receive, send)
+        else:
+            await app(scope, receive, send)
 
 
 class AirflowMCPPlugin(AirflowPlugin):
@@ -116,5 +118,6 @@ class AirflowMCPPlugin(AirflowPlugin):
 
     @property
     def fastapi_apps(self):
-        stateless = StatelessMCPMount(path="/mcp")
-        return [{"app": stateless, "url_prefix": "/", "name": "Airflow MCP"}]
+        # Mount our ASGI app under /mcp so we don't intercept core Airflow routes
+        stateless = StatelessMCPMount(path="/")
+        return [{"app": stateless, "url_prefix": "/mcp", "name": "Airflow MCP"}]
