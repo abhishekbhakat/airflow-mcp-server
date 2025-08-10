@@ -18,7 +18,7 @@ dependencies = [
   "apache-airflow>=3.0.0",
   "fastmcp>=2.5.2",
   "httpx>=0.28.1",
-  "airflow-mcp-server>=0.8.0",
+  "airflow-mcp-server>=0.8.1",
 ]
 
 license = "MIT"
