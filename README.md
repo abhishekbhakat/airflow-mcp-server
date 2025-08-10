@@ -40,6 +40,19 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
 }
 ```
 
+### Airflow 3 Plugin (Streamable HTTP at /mcp)
+
+Install the plugin alongside the server to mount an MCP endpoint directly in the Airflow webserver:
+
+```bash
+pip install "airflow-mcp-server[airflow-plugin]"
+```
+
+- Airflow auto-loads the plugin via entry point
+- Endpoint: `http(s)://<airflow-host>/mcp`
+- Stateless: every request must include `Authorization: Bearer <access-token>`
+- Modes (per-request): safe by default, or `?mode=unsafe` to enable write operations
+
 #### HTTP Transport
 ```json
 {
