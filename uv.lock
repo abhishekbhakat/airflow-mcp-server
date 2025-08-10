@@ -33,7 +33,7 @@ wheels = [
 
 [[package]]
 name = "airflow-mcp-plugin"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "airflow-mcp-server" },
@@ -41,14 +41,14 @@ dependencies = [
     { name = "fastmcp" },
     { name = "httpx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/82/89/c336abccf42ca3daf73502a511eda40b9ee42b75092f55547e5c67f5058e/airflow_mcp_plugin-0.1.0.tar.gz", hash = "sha256:838f91524fefeb55ee4884ebb5ee84f6ec5ef60151cd6035250df9d185933b67", size = 5239, upload-time = "2025-08-10T13:19:57.57Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/6d/833cbfda08c30150f27c444012d48285d98b1930072930b4e970ba64fda9/airflow_mcp_plugin-0.1.1.tar.gz", hash = "sha256:6e4aade4af633c2563a5b085ca2a8eaa734a4e21039acf49b870b2d5b948a0c4", size = 5243, upload-time = "2025-08-10T13:53:22.728Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/3d/2ff5d01027f978bbe77ee2023b8cbf7d0af0044e82c02572360dca63c0de/airflow_mcp_plugin-0.1.0-py3-none-any.whl", hash = "sha256:4bb68194c420b8e3096403c1cc5b688963a9b8de8e8069e830c3ad598dc71c43", size = 4631, upload-time = "2025-08-10T13:19:56.657Z" },
+    { url = "https://files.pythonhosted.org/packages/be/36/e48baf4c7ab4ba338aed4b0edcb84003b2e1dac239bd29335f891b33bfb2/airflow_mcp_plugin-0.1.1-py3-none-any.whl", hash = "sha256:61c55d86200e0d22cf1581172cd3906582077db2268aa78e078ac1853a55a40d", size = 4660, upload-time = "2025-08-10T13:53:21.825Z" },
 ]
 
 [[package]]
 name = "airflow-mcp-server"
-version = "0.8.0"
+version = "0.8.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -71,7 +71,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "airflow-mcp-plugin", marker = "extra == 'airflow-plugin'", specifier = ">=0.1.0" },
+    { name = "airflow-mcp-plugin", marker = "extra == 'airflow-plugin'", specifier = ">=0.1.1" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.2.post1" },
     { name = "click", specifier = ">=8.2.1" },
     { name = "fastmcp", specifier = ">=2.5.2" },
