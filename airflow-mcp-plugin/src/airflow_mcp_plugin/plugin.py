@@ -81,6 +81,25 @@ class StatelessMCPMount:
 
         server_name = "Airflow MCP Server (Unsafe Mode)" if is_unsafe else "Airflow MCP Server (Safe Mode)"
         allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"] if is_unsafe else ["GET"]
+
+        # Pre-filter OpenAPI operations so Safe mode only exposes GET endpoints
+        if not is_unsafe:
+            paths = openapi_spec.get("paths", {})
+            filtered_paths: dict[str, dict] = {}
+            for path, path_item in paths.items():
+                new_item: dict[str, dict] = {}
+                for method, operation in path_item.items():
+                    lower_method = method.lower()
+                    if lower_method in {"get", "post", "put", "delete", "patch"}:
+                        if method.upper() in allowed_methods:
+                            new_item[lower_method] = operation
+                    # keep non-operation keys only if there will be operations
+                if new_item:
+                    # preserve common keys like parameters if present
+                    if isinstance(path_item, dict) and "parameters" in path_item:
+                        new_item["parameters"] = path_item["parameters"]
+                    filtered_paths[path] = new_item
+            openapi_spec = {**openapi_spec, "paths": filtered_paths}
         route_maps = [RouteMap(methods=allowed_methods, mcp_type=MCPType.TOOL)]
 
         mcp = FastMCP.from_openapi(
