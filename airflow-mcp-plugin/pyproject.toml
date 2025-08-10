@@ -1,0 +1,86 @@
+[project]
+name = "airflow-mcp-plugin"
+version = "0.1.0"
+description = "Apache Airflow 3 plugin that mounts airflow-mcp-server as a Streamable HTTP endpoint at /mcp"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Abhishek Bhakat", email = "abhishek.bhakat@hotmail.com" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.10",
+]
+ dependencies = [
+   "apache-airflow>=3.0.0",
+   "fastmcp>=2.5.2",
+   "httpx>=0.28.1",
+   "airflow-mcp-server>=0.8.0rc1",
+ ]
+
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+ [project.entry-points."airflow.plugins"]
+ airflow_mcp_plugin = "airflow_mcp_plugin.plugin:AirflowMCPPlugin"
+
+ [build-system]
+ requires = ["hatchling"]
+ build-backend = "hatchling.build"
+
+ [tool.hatch.build.targets.sdist]
+ include = [
+   "src/**",
+   "pyproject.toml",
+   "README.md",
+  "LICENSE",
+ ]
+
+ [tool.hatch.build.targets.wheel]
+ packages = ["src/airflow_mcp_plugin"]
+
+ [tool.hatch.build.targets.wheel.sources]
+ "src/airflow_mcp_plugin" = "airflow_mcp_plugin"
+
+[tool.ruff]
+line-length = 200
+indent-width = 4
+fix = true
+preview = true
+
+lint.select = [
+  "E",
+  "F",
+  "I",
+  "W",
+  "C90",
+  "C",
+  "ISC",
+  "T10",
+  "A",
+  "UP",
+]
+
+lint.ignore = [
+  "C416",
+  "C408",
+  "ISC001",
+]
+
+lint.fixable = ["ALL"]
+lint.unfixable = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
