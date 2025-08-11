@@ -30,6 +30,9 @@ airflow_mcp_plugin = "airflow_mcp_plugin.plugin:AirflowMCPPlugin"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.sdist]
 include = [
   "src/**",
