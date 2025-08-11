@@ -5,8 +5,11 @@ import logging
 
 import httpx
 from airflow.plugins_manager import AirflowPlugin
-from fastmcp import FastMCP
-from fastmcp.server.openapi import MCPType, RouteMap
+from fastmcp.experimental.server.openapi import (
+    FastMCPOpenAPI,
+    MCPType,
+    RouteMap,
+)
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -101,8 +104,7 @@ class StatelessMCPMount:
                     filtered_paths[path] = new_item
             openapi_spec = {**openapi_spec, "paths": filtered_paths}
         route_maps = [RouteMap(methods=allowed_methods, mcp_type=MCPType.TOOL)]
-
-        mcp = FastMCP.from_openapi(
+        mcp = FastMCPOpenAPI(
             openapi_spec=openapi_spec,
             client=client,
             name=server_name,
