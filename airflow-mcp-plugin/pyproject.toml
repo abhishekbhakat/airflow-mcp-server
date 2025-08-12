@@ -16,7 +16,7 @@ classifiers = [
 ]
 dependencies = [
   "apache-airflow>=3.0.0",
-  "fastmcp @ git+https://github.com/jlowin/fastmcp.git@f8f05ca395d38512c70697687611e02400df6963",
+  "fastmcp>=2.11.3",
   "httpx>=0.28.1",
 ]
 
