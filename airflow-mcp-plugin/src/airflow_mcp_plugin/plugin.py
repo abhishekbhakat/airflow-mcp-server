@@ -17,6 +17,24 @@ from starlette.responses import JSONResponse, Response
 logger = logging.getLogger(__name__)
 
 
+def _compute_airflow_prefix(request: Request) -> str:
+    """Detect deployment path prefix (e.g., Astronomer's '/<deployment>') and drop '/mcp'.
+
+    Prefers 'X-Forwarded-Prefix' header when present, otherwise uses ASGI root_path.
+    Ensures the returned prefix does not include the plugin mount ('/mcp').
+    """
+    # Starlette headers are case-insensitive
+    forwarded_prefix = request.headers.get("x-forwarded-prefix") or ""
+    root_path = request.scope.get("root_path") or ""
+
+    prefix = forwarded_prefix or root_path or ""
+    if prefix.endswith("/"):
+        prefix = prefix[:-1]
+    if prefix.endswith("/mcp"):
+        prefix = prefix[: -len("/mcp")] or ""
+    return prefix
+
+
 class StatelessMCPMount:
     """FastAPI-compatible object that creates a stateless MCP server.
 
@@ -45,7 +63,7 @@ class StatelessMCPMount:
                 timeout=30.0,
             )
             try:
-                resp = await client.get("/openapi.json")
+                resp = await client.get("openapi.json")
                 resp.raise_for_status()
                 self._openapi_spec = resp.json()
                 return self._openapi_spec
@@ -68,7 +86,8 @@ class StatelessMCPMount:
         is_unsafe = mode_param == "unsafe"
 
         url = request.url
-        base_url = f"{url.scheme}://{url.netloc}"
+        airflow_prefix = _compute_airflow_prefix(request)
+        base_url = f"{url.scheme}://{url.netloc}{airflow_prefix}"
 
         openapi_spec = await self._ensure_openapi_spec(base_url, token)
         if openapi_spec is None:
