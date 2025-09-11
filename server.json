@@ -1,0 +1,105 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.abhishekbhakat/airflow-mcp-server",
+  "description": "An MCP server for Apache Airflow ",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/abhishekbhakat/airflow-mcp-server",
+    "source": "github"
+  },
+  "version": "0.8.0",
+  "packages": [
+    {
+      "registry_type": "pypi",
+      "registry_base_url": "https://pypi.org",
+      "identifier": "airflow-mcp-server",
+      "version": "0.8.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "description": "The base URL for the Airflow API (e.g., http://localhost:8080)",
+          "is_required": true,
+          "format": "string",
+          "is_secret": false,
+          "name": "AIRFLOW_BASE_URL"
+        },
+        {
+          "description": "The JWT authentication token for Airflow API access",
+          "is_required": true,
+          "format": "string",
+          "is_secret": true,
+          "name": "AUTH_TOKEN"
+        }
+      ],
+      "package_arguments": [
+        {
+          "type": "named",
+          "name": "--safe",
+          "description": "Use only read-only tools for safe operations"
+        },
+        {
+          "type": "named",
+          "name": "--static-tools",
+          "description": "Use static tools instead of hierarchical discovery"
+        }
+      ]
+    },
+    {
+      "registry_type": "pypi",
+      "registry_base_url": "https://pypi.org",
+      "identifier": "airflow-mcp-server",
+      "version": "0.8.2",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:3000"
+      },
+      "environment_variables": [
+        {
+          "description": "The base URL for the Airflow API (e.g., http://localhost:8080)",
+          "is_required": true,
+          "format": "string",
+          "is_secret": false,
+          "name": "AIRFLOW_BASE_URL"
+        },
+        {
+          "description": "The JWT authentication token for Airflow API access",
+          "is_required": true,
+          "format": "string",
+          "is_secret": true,
+          "name": "AUTH_TOKEN"
+        }
+      ],
+      "package_arguments": [
+        {
+          "type": "named",
+          "name": "--http",
+          "description": "Use HTTP (Streamable HTTP) transport"
+        },
+        {
+          "type": "named",
+          "name": "--port",
+          "value": "3000",
+          "description": "Port to run HTTP server on"
+        },
+        {
+          "type": "named",
+          "name": "--host",
+          "value": "localhost",
+          "description": "Host to bind HTTP server to"
+        },
+        {
+          "type": "named",
+          "name": "--safe",
+          "description": "Use only read-only tools for safe operations"
+        },
+        {
+          "type": "named",
+          "name": "--static-tools",
+          "description": "Use static tools instead of hierarchical discovery"
+        }
+      ]
+    }
+  ]
+}
