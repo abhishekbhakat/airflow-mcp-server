@@ -183,3 +183,11 @@ project_resources/
 
 # Airflow
 AIRFLOW_HOME/
+
+# AI
+.cursor/
+.vscode/
+
+# MCP Registry
+.mcpregistry_github_token
+.mcpregistry_registry_token
