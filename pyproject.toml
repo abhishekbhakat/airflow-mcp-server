@@ -8,7 +8,7 @@ authors = [
     {name = "Abhishek Bhakat", email = "abhishek.bhakat@hotmail.com"}
 ]
 dependencies = [
-    "fastmcp>=2.5.2",
+    "fastmcp>=2.11.3",
     "httpx>=0.28.1",
     "click>=8.2.1",
 ]
@@ -81,6 +81,7 @@ lint.select = [
     "T10",  # flake8-debugger
     "A",  # flake8-builtins
     "UP",  # pyupgrade
+    "TID",  # flake8-tidy-imports (includes TID252 for banning relative imports)
 ]
 
 lint.ignore = [
@@ -108,3 +109,6 @@ combine-as-imports = true
 
 [tool.ruff.lint.mccabe]
 max-complexity = 12
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"

@@ -6,7 +6,7 @@ import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.server.openapi import MCPType, RouteMap
 
-from .utils.category_mapper import extract_categories_from_openapi, filter_routes_by_methods, get_category_info, get_category_tools_info
+from airflow_mcp_server.utils.category_mapper import extract_categories_from_openapi, filter_routes_by_methods, get_category_info, get_category_tools_info
 
 logger = logging.getLogger(__name__)
 
