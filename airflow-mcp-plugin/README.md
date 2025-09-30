@@ -26,7 +26,7 @@ Config:
 {
   "mcpServers": {
     "airflow-mcp-server": {
-      "type": "sse",
+      "type": "http",
       "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer <token>"
