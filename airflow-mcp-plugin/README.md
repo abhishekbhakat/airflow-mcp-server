@@ -41,5 +41,5 @@ Use (stateless):
 - The token is forwarded per-request to Airflow APIs (no shared auth state)
 - Mode per-request:
   - Safe (default): `http(s)://<airflow-host>/mcp`
-  - Unsafe: `http(s)://<airflow-host>/mcp?mode=unsafe` (enables POST/PUT/DELETE/PATCH)
+  - Unsafe: `http(s)://<airflow-host>/mcp/?mode=unsafe` (enables POST/PUT/DELETE/PATCH)
   - Streamable HTTP (stateless)
