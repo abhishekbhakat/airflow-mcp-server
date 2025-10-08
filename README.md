@@ -1,12 +1,10 @@
-# airflow-mcp-server: An MCP Server for controlling Airflow
+# airflow-mcp-server: An MCP Server for controlling Airflow 3
 
 mcp-name: io.github.abhishekbhakat/airflow-mcp-server
 
 ### MCPHub Certification
 
 This MCP server is certified by [MCPHub](https://mcphub.com/mcp-servers/abhishekbhakat/airflow-mcp-server). This certification ensures that airflow-mcp-server follows best practices for Model Context Protocol implementation.
-
-<span style="color:red;">**NOTE:**</span> This Airflow MCP will only work with Airflow 3. 
 
 ### Find on Glama
 
