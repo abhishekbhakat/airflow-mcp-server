@@ -191,3 +191,6 @@ AIRFLOW_HOME/
 # MCP Registry
 .mcpregistry_github_token
 .mcpregistry_registry_token
+
+# MAC
+.DS_Store
