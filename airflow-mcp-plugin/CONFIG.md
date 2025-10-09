@@ -6,7 +6,7 @@ The plugin exposes a **Streamable HTTP** endpoint at `http(s)://<airflow-host>/m
 - Provide the per-request header `Authorization: Bearer <access-token>`
 - Optionally append `?mode=unsafe` to enable write operations
 
-Replace `<airflow-host>` with the address of your Airflow webserver (default examples below use `http://localhost:8000`).
+Replace `<airflow-host>` with the address of your Airflow webserver (default examples below use `http://localhost:8080`).
 
 > Many MCP clients (Cursor, Claude Desktop, Windsurf, JetBrains, etc.) rely on the [`mcp-remote`](https://github.com/geelen/mcp-remote) helper to forward custom headers to remote servers. Examples below use that wrapper when direct header injection is not yet supported.
 
@@ -23,7 +23,7 @@ Replace `<airflow-host>` with the address of your Airflow webserver (default exa
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8000/mcp",
+        "http://localhost:8080/mcp",
         "--header",
         "Authorization:${MCP_AIRFLOW_TOKEN}"
       ],
@@ -38,7 +38,7 @@ Replace `<airflow-host>` with the address of your Airflow webserver (default exa
 ## Claude Code CLI
 
 ```bash
-claude mcp add --transport http airflow-plugin http://localhost:8000/mcp --header "Authorization: Bearer <access-token>"
+claude mcp add --transport http airflow-plugin http://localhost:8080/mcp --header "Authorization: Bearer <access-token>"
 ```
 
 ## Claude Desktop
@@ -52,7 +52,7 @@ claude mcp add --transport http airflow-plugin http://localhost:8000/mcp --heade
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8000/mcp",
+        "http://localhost:8080/mcp",
         "--header",
         "Authorization:${MCP_AIRFLOW_TOKEN}"
       ],
@@ -75,7 +75,7 @@ claude mcp add --transport http airflow-plugin http://localhost:8000/mcp --heade
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8000/mcp",
+        "http://localhost:8080/mcp",
         "--header",
         "Authorization:${MCP_AIRFLOW_TOKEN}"
       ],
@@ -96,7 +96,7 @@ claude mcp add --transport http airflow-plugin http://localhost:8000/mcp --heade
   "servers": {
     "airflow-mcp-plugin": {
       "type": "http",
-      "url": "http://localhost:8000/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <access-token>"
       }
@@ -116,7 +116,7 @@ Settings → Tools → AI Assistant → Model Context Protocol:
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8000/mcp",
+        "http://localhost:8080/mcp",
         "--header",
         "Authorization:${MCP_AIRFLOW_TOKEN}"
       ],
@@ -136,7 +136,7 @@ Settings → Tools → AI Assistant → Model Context Protocol:
 {
   "mcpServers": {
     "airflow-mcp-plugin": {
-      "url": "http://localhost:8000/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <access-token>"
       }
@@ -154,7 +154,7 @@ Settings → Tools → AI Assistant → Model Context Protocol:
   "context_servers": {
     "Airflow MCP Plugin": {
       "type": "streamableHttp",
-      "url": "http://localhost:8000/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <access-token>"
       }
@@ -172,7 +172,7 @@ Repository → Settings → Copilot → Coding Agent → MCP configuration:
   "mcpServers": {
     "airflow-mcp-plugin": {
       "type": "http",
-      "url": "http://localhost:8000/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <access-token>"
       }
@@ -189,7 +189,7 @@ Repository → Settings → Copilot → Coding Agent → MCP configuration:
 {
   "mcpServers": {
     "airflow-mcp-plugin": {
-      "httpUrl": "http://localhost:8000/mcp",
+      "httpUrl": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <access-token>",
         "Accept": "application/json, text/event-stream"
@@ -206,7 +206,7 @@ Settings → AI → Manage MCP servers:
 ```json
 {
   "Airflow Plugin": {
-    "url": "http://localhost:8000/mcp",
+    "url": "http://localhost:8080/mcp",
     "headers": {
       "Authorization": "Bearer <access-token>"
     }
@@ -223,7 +223,7 @@ Settings → AI → Manage MCP servers:
   "mcpServers": {
     "airflow-mcp-plugin": {
       "type": "streamable-http",
-      "url": "http://localhost:8000/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <access-token>"
       }
@@ -238,7 +238,7 @@ Settings → Connectors → Advanced:
 
 ```json
 {
-  "url": "http://localhost:8000/mcp",
+  "url": "http://localhost:8080/mcp",
   "headers": {
     "Authorization": "Bearer <access-token>"
   }
@@ -253,7 +253,7 @@ Settings → Connectors → Advanced:
 {
   "mcpServers": {
     "airflow-mcp-plugin": {
-      "url": "http://localhost:8000/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <access-token>"
       }
@@ -268,5 +268,5 @@ Settings → Connectors → Advanced:
 
 - Confirm that Airflow webserver ingress permits requests to `/mcp` and forwards headers intact.
 - Ensure tokens have sufficient scope for the desired Airflow API operations; otherwise calls will fail downstream.
-- When running behind reverse proxies, update `http://localhost:8000` to the externally reachable URL and configure TLS as needed.
+- When running behind reverse proxies, update `http://localhost:8080` to the externally reachable URL and configure TLS as needed.
 - If your MCP client does not yet support direct header configuration, proxy through `mcp-remote` (as shown in the examples above) to inject the `Authorization` header.

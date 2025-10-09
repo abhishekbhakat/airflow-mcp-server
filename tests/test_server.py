@@ -1,8 +1,8 @@
 """Tests for server modules."""
 
-from unittest.mock import AsyncMock, Mock, patch
+from typing import Any
+from unittest.mock import ANY, AsyncMock, Mock, patch
 
-import httpx
 import pytest
 
 from airflow_mcp_server import server_safe, server_unsafe
@@ -22,295 +22,185 @@ def mock_openapi_response():
 
 
 @pytest.mark.asyncio
-async def test_safe_server_initialization(mock_config, mock_openapi_response):
-    """Test safe server initialization."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
+async def test_safe_server_delegates_to_runtime(mock_config):
+    runtime_mock = AsyncMock()
+    with patch("airflow_mcp_server.server_safe._serve_airflow", runtime_mock):
+        await server_safe.serve(mock_config, static_tools=True, transport="stdio", resources_dir="/tmp/resources")
 
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
-
-        with patch("airflow_mcp_server.server_safe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_safe.HierarchicalToolManager") as mock_manager:
-                with patch("airflow_mcp_server.server_safe.add_airflow_resources") as mock_resources:
-                    with patch("airflow_mcp_server.server_safe.add_airflow_prompts") as mock_prompts:
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock()
-
-                        # This should not raise an exception
-                        await server_safe.serve(mock_config)
-
-                        # Verify client was created with correct parameters
-                        mock_client_class.assert_called_once_with(base_url="http://localhost:8080", headers={"Authorization": "Bearer test-token"}, timeout=30.0)
-
-                        # Verify OpenAPI spec was fetched
-                        mock_client.get.assert_called_once_with("/openapi.json")
-
-                        # Verify FastMCP was created
-                        mock_fastmcp.assert_called_once_with("Airflow MCP Server (Safe Mode)")
-
-                        # Verify HierarchicalToolManager was created with safe mode
-                        mock_manager.assert_called_once()
-                        call_args = mock_manager.call_args
-                        assert call_args[1]["allowed_methods"] == {"GET"}
-
-                        # Verify resources and prompts were added
-                        mock_resources.assert_called_once_with(mock_mcp_instance, mock_config, mode="safe")
-                        mock_prompts.assert_called_once_with(mock_mcp_instance, mode="safe")
+    runtime_mock.assert_awaited_once()
+    kwargs = runtime_mock.await_args.kwargs
+    assert kwargs["allowed_methods"] == {"GET"}
+    assert kwargs["static_tools"] is True
+    assert kwargs["resources_dir"] == "/tmp/resources"
 
 
 @pytest.mark.asyncio
-async def test_unsafe_server_initialization(mock_config, mock_openapi_response):
-    """Test unsafe server initialization."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
+async def test_unsafe_server_delegates_to_runtime(mock_config):
+    runtime_mock = AsyncMock()
+    with patch("airflow_mcp_server.server_unsafe._serve_airflow", runtime_mock):
+        await server_unsafe.serve(mock_config, static_tools=False, transport="streamable-http")
 
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
-
-        with patch("airflow_mcp_server.server_unsafe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_unsafe.HierarchicalToolManager") as mock_manager:
-                with patch("airflow_mcp_server.server_unsafe.add_airflow_resources") as mock_resources:
-                    with patch("airflow_mcp_server.server_unsafe.add_airflow_prompts") as mock_prompts:
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock()
-
-                        # This should not raise an exception
-                        await server_unsafe.serve(mock_config)
-
-                        # Verify FastMCP was created
-                        mock_fastmcp.assert_called_once_with("Airflow MCP Server (Unsafe Mode)")
-
-                        # Verify HierarchicalToolManager was created with all methods
-                        mock_manager.assert_called_once()
-                        call_args = mock_manager.call_args
-                        assert call_args[1]["allowed_methods"] == {"GET", "POST", "PUT", "DELETE", "PATCH"}
-
-                        # Verify resources and prompts were added
-                        mock_resources.assert_called_once_with(mock_mcp_instance, mock_config, mode="unsafe")
-                        mock_prompts.assert_called_once_with(mock_mcp_instance, mode="unsafe")
+    runtime_mock.assert_awaited_once()
+    kwargs = runtime_mock.await_args.kwargs
+    assert kwargs["allowed_methods"] == {"GET", "POST", "PUT", "DELETE", "PATCH"}
+    assert kwargs["transport"] == "streamable-http"
 
 
-@pytest.mark.asyncio
-async def test_server_openapi_fetch_error(mock_config):
-    """Test server handling of OpenAPI fetch error."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
 
-        # Mock HTTP error
-        mock_client.get.side_effect = httpx.HTTPError("Connection failed")
+    async def __aenter__(self):
+        return self
 
-        with pytest.raises(httpx.HTTPError):
-            await server_safe.serve(mock_config)
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
 
-        # Verify client was closed on error
-        mock_client.aclose.assert_called_once()
+    def raise_for_status(self):
+        return None
+
+    async def json(self):
+        return self._payload
+
+
+class _FakeSession:
+    def __init__(self, response: Any):
+        self._response = response
+        self.closed = False
+        self.requests: list[tuple[str, dict[str, Any]]] = []
+
+    def get(self, path):
+        return self._response
+
+    async def close(self):
+        self.closed = True
 
 
 @pytest.mark.asyncio
-async def test_server_run_error(mock_config, mock_openapi_response):
-    """Test server handling of run error."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
+async def test_serve_airflow_static_tools(monkeypatch, mock_config, mock_openapi_response):
+    fake_response = _FakeResponse(mock_openapi_response)
+    fake_session = _FakeSession(fake_response)
 
-        # Mock successful OpenAPI fetch
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
+    monkeypatch.setattr("airflow_mcp_server.server_safe.aiohttp.ClientSession", lambda **_: fake_session)
 
-        with patch("airflow_mcp_server.server_safe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_safe.HierarchicalToolManager"):
-                with patch("airflow_mcp_server.server_safe.add_airflow_resources"):
-                    with patch("airflow_mcp_server.server_safe.add_airflow_prompts"):
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock(side_effect=RuntimeError("Server error"))
+    toolset_instance = Mock()
+    with patch("airflow_mcp_server.server_safe.AirflowOpenAPIToolset", return_value=toolset_instance) as toolset_cls:
+        with patch("airflow_mcp_server.server_safe._register_static_tools") as register_static:
+            with patch("airflow_mcp_server.server_safe.HierarchicalToolManager") as manager_cls:
+                with patch("airflow_mcp_server.server_safe.register_resources") as register_resources:
+                    run_stdio = AsyncMock()
+                    with patch("airflow_mcp_server.server_safe._run_stdio", run_stdio):
+                        await server_safe._serve_airflow(
+                            config=mock_config,
+                            allowed_methods={"GET"},
+                            mode_label="Safe Mode",
+                            static_tools=True,
+                            resources_dir=None,
+                            transport="stdio",
+                            transport_kwargs={},
+                        )
 
-                        with pytest.raises(RuntimeError):
-                            await server_safe.serve(mock_config)
-
-                        # Verify client was closed on error
-                        mock_client.aclose.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_safe_server_http_transport(mock_config, mock_openapi_response):
-    """Test safe server with HTTP transport."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
-
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
-
-        with patch("airflow_mcp_server.server_safe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_safe.HierarchicalToolManager"):
-                with patch("airflow_mcp_server.server_safe.add_airflow_resources"):
-                    with patch("airflow_mcp_server.server_safe.add_airflow_prompts"):
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock()
-
-                        await server_safe.serve(mock_config, transport="streamable-http", port=3000, host="localhost")
-
-                        mock_mcp_instance.run_async.assert_called_once_with(transport="streamable-http", port=3000, host="localhost")
+    toolset_cls.assert_called_once_with(mock_openapi_response, allow_mutations=False, session=fake_session)
+    register_static.assert_called_once()
+    manager_cls.assert_not_called()
+    register_resources.assert_called_once()
+    run_stdio.assert_awaited_once()
+    assert fake_session.closed is True
 
 
 @pytest.mark.asyncio
-async def test_safe_server_sse_transport(mock_config, mock_openapi_response):
-    """Test safe server with SSE transport."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
+async def test_serve_airflow_hierarchical_http(monkeypatch, mock_config, mock_openapi_response):
+    fake_response = _FakeResponse(mock_openapi_response)
+    fake_session = _FakeSession(fake_response)
 
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
+    monkeypatch.setattr("airflow_mcp_server.server_safe.aiohttp.ClientSession", lambda **_: fake_session)
 
-        with patch("airflow_mcp_server.server_safe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_safe.HierarchicalToolManager"):
-                with patch("airflow_mcp_server.server_safe.add_airflow_resources"):
-                    with patch("airflow_mcp_server.server_safe.add_airflow_prompts"):
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock()
+    toolset_instance = Mock()
+    with patch("airflow_mcp_server.server_safe.AirflowOpenAPIToolset", return_value=toolset_instance) as toolset_cls:
+        register_static = patch("airflow_mcp_server.server_safe._register_static_tools").start()
+        register_resources = patch("airflow_mcp_server.server_safe.register_resources").start()
+        manager_cls = patch("airflow_mcp_server.server_safe.HierarchicalToolManager").start()
+        run_http = AsyncMock()
+        patch("airflow_mcp_server.server_safe._run_streamable_http", run_http).start()
+        try:
+            await server_safe._serve_airflow(
+                config=mock_config,
+                allowed_methods={"GET", "POST"},
+                mode_label="Unsafe Mode",
+                static_tools=False,
+                resources_dir="/tmp/resources",
+                transport="streamable-http",
+                transport_kwargs={"host": "127.0.0.1", "port": 4000},
+            )
+        finally:
+            patch.stopall()
 
-                        await server_safe.serve(mock_config, transport="sse", port=3001, host="0.0.0.0")
-
-                        mock_mcp_instance.run_async.assert_called_once_with(transport="sse", port=3001, host="0.0.0.0")
-
-
-@pytest.mark.asyncio
-async def test_safe_server_stdio_transport(mock_config, mock_openapi_response):
-    """Test safe server with default stdio transport."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
-
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
-
-        with patch("airflow_mcp_server.server_safe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_safe.HierarchicalToolManager"):
-                with patch("airflow_mcp_server.server_safe.add_airflow_resources"):
-                    with patch("airflow_mcp_server.server_safe.add_airflow_prompts"):
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock()
-
-                        await server_safe.serve(mock_config, transport="stdio")
-
-                        mock_mcp_instance.run_async.assert_called_once_with()
+    toolset_cls.assert_called_once_with(mock_openapi_response, allow_mutations=True, session=fake_session)
+    register_static.assert_not_called()
+    manager_cls.assert_called_once()
+    register_resources.assert_called_once()
+    run_http.assert_awaited_once_with(ANY, host="127.0.0.1", port=4000)
+    assert fake_session.closed is True
 
 
 @pytest.mark.asyncio
-async def test_unsafe_server_http_transport(mock_config, mock_openapi_response):
-    """Test unsafe server with HTTP transport."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
+async def test_serve_airflow_fetch_error(monkeypatch, mock_config):
+    class FailingResponse:
+        async def __aenter__(self):
+            raise RuntimeError("boom")
 
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
 
-        with patch("airflow_mcp_server.server_unsafe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_unsafe.HierarchicalToolManager"):
-                with patch("airflow_mcp_server.server_unsafe.add_airflow_resources"):
-                    with patch("airflow_mcp_server.server_unsafe.add_airflow_prompts"):
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock()
+    class FailingSession(_FakeSession):
+        def get(self, path):
+            return FailingResponse()
 
-                        await server_unsafe.serve(mock_config, transport="streamable-http", port=3000, host="localhost")
+    fake_session = FailingSession(None)
+    monkeypatch.setattr("airflow_mcp_server.server_safe.aiohttp.ClientSession", lambda **_: fake_session)
 
-                        mock_mcp_instance.run_async.assert_called_once_with(transport="streamable-http", port=3000, host="localhost")
+    with pytest.raises(RuntimeError):
+        await server_safe._serve_airflow(
+            config=mock_config,
+            allowed_methods={"GET"},
+            mode_label="Safe Mode",
+            static_tools=True,
+            resources_dir=None,
+            transport="stdio",
+            transport_kwargs={},
+        )
 
-
-@pytest.mark.asyncio
-async def test_unsafe_server_sse_transport(mock_config, mock_openapi_response):
-    """Test unsafe server with SSE transport."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
-
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
-
-        with patch("airflow_mcp_server.server_unsafe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_unsafe.HierarchicalToolManager"):
-                with patch("airflow_mcp_server.server_unsafe.add_airflow_resources"):
-                    with patch("airflow_mcp_server.server_unsafe.add_airflow_prompts"):
-                        mock_mcp_instance = Mock()
-                        mock_fastmcp.return_value = mock_mcp_instance
-                        mock_mcp_instance.run_async = AsyncMock()
-
-                        await server_unsafe.serve(mock_config, transport="sse", port=3001, host="0.0.0.0")
-
-                        mock_mcp_instance.run_async.assert_called_once_with(transport="sse", port=3001, host="0.0.0.0")
+    assert fake_session.closed is True
 
 
 @pytest.mark.asyncio
-async def test_server_config_validation():
-    """Test server config validation."""
+async def test_serve_airflow_requires_valid_config():
     config_no_url = AirflowConfig.__new__(AirflowConfig)
     config_no_url.base_url = None
-    config_no_url.auth_token = "test-token"
+    config_no_url.auth_token = "token"
 
     with pytest.raises(ValueError, match="base_url is required"):
-        await server_safe.serve(config_no_url)
+        await server_safe._serve_airflow(
+            config=config_no_url,
+            allowed_methods={"GET"},
+            mode_label="Safe Mode",
+            static_tools=True,
+            resources_dir=None,
+            transport="stdio",
+            transport_kwargs={},
+        )
 
     config_no_token = AirflowConfig.__new__(AirflowConfig)
-    config_no_token.base_url = "http://localhost:8080"
+    config_no_token.base_url = "http://localhost"
     config_no_token.auth_token = None
 
     with pytest.raises(ValueError, match="auth_token is required"):
-        await server_safe.serve(config_no_token)
-
-
-@pytest.mark.asyncio
-async def test_static_tools_mode_http_transport(mock_config, mock_openapi_response):
-    """Test static tools mode with HTTP transport."""
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_client_class.return_value = mock_client
-
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = mock_openapi_response
-        mock_client.get.return_value = mock_response
-
-        with patch("airflow_mcp_server.server_safe.FastMCP") as mock_fastmcp:
-            with patch("airflow_mcp_server.server_safe.add_airflow_resources"):
-                with patch("airflow_mcp_server.server_safe.add_airflow_prompts"):
-                    mock_mcp_instance = Mock()
-                    mock_fastmcp.from_openapi.return_value = mock_mcp_instance
-                    mock_mcp_instance.run_async = AsyncMock()
-
-                    await server_safe.serve(mock_config, static_tools=True, transport="streamable-http", port=3000)
-
-                    mock_fastmcp.from_openapi.assert_called_once()
-                    call_args = mock_fastmcp.from_openapi.call_args
-                    assert call_args[1]["openapi_spec"] == mock_openapi_response
-                    assert call_args[1]["client"] == mock_client
-
-                    mock_mcp_instance.run_async.assert_called_once_with(transport="streamable-http", port=3000)
+        await server_safe._serve_airflow(
+            config=config_no_token,
+            allowed_methods={"GET"},
+            mode_label="Safe Mode",
+            static_tools=True,
+            resources_dir=None,
+            transport="stdio",
+            transport_kwargs={},
+        )

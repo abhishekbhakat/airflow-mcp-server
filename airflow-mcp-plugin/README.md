@@ -40,7 +40,7 @@ Claude Desktop requires a helper wrapper to forward headers. Add the plugin endp
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8000/mcp",
+        "http://localhost:8080/mcp",
         "--header",
         "Authorization:${MCP_AIRFLOW_TOKEN}"
       ],

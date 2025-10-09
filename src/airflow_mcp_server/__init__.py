@@ -17,6 +17,7 @@ from airflow_mcp_server.server_unsafe import serve as serve_unsafe
 @click.option("--static-tools", is_flag=True, help="Use static tools instead of hierarchical discovery")
 @click.option("--base-url", help="Airflow API base URL")
 @click.option("--auth-token", help="Authentication token (JWT)")
+@click.option("--resources-dir", type=str, help="Directory of Markdown files to expose as MCP resources")
 @click.option("--http", is_flag=True, help="Use HTTP (Streamable HTTP) transport instead of stdio")
 @click.option("--sse", is_flag=True, help="Use Server-Sent Events transport (deprecated, use --http instead)")
 @click.option("--port", type=int, default=3000, help="Port to run HTTP/SSE server on (default: 3000)")
@@ -29,6 +30,7 @@ def main(
     static_tools: bool,
     base_url: str | None = None,
     auth_token: str | None = None,
+    resources_dir: str | None = None,
     http: bool = False,
     sse: bool = False,
     port: int = 3000,
@@ -50,6 +52,8 @@ def main(
 
     config_base_url = os.environ.get("AIRFLOW_BASE_URL") or base_url
     config_auth_token = os.environ.get("AUTH_TOKEN") or auth_token
+    env_resources_dir = os.environ.get("AIRFLOW_MCP_RESOURCES_DIR")
+    selected_resources_dir = resources_dir if resources_dir is not None else env_resources_dir
 
     try:
         config = AirflowConfig(base_url=config_base_url, auth_token=config_auth_token)
@@ -67,11 +71,11 @@ def main(
     if safe and unsafe:
         raise click.UsageError("Options --safe and --unsafe are mutually exclusive")
     elif safe:
-        asyncio.run(serve_safe(config, static_tools=static_tools, transport=transport_type, **transport_config))
+        asyncio.run(serve_safe(config, static_tools=static_tools, transport=transport_type, resources_dir=selected_resources_dir, **transport_config))
     elif unsafe:
-        asyncio.run(serve_unsafe(config, static_tools=static_tools, transport=transport_type, **transport_config))
+        asyncio.run(serve_unsafe(config, static_tools=static_tools, transport=transport_type, resources_dir=selected_resources_dir, **transport_config))
     else:
-        asyncio.run(serve_unsafe(config, static_tools=static_tools, transport=transport_type, **transport_config))
+        asyncio.run(serve_unsafe(config, static_tools=static_tools, transport=transport_type, resources_dir=selected_resources_dir, **transport_config))
 
 
 if __name__ == "__main__":

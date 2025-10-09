@@ -1,65 +1,24 @@
-import logging
 from typing import Literal
 
-import httpx
-from fastmcp import FastMCP
-from fastmcp.server.openapi import MCPType, RouteMap
-
 from airflow_mcp_server.config import AirflowConfig
-from airflow_mcp_server.hierarchical_manager import HierarchicalToolManager
-from airflow_mcp_server.prompts import add_airflow_prompts
-from airflow_mcp_server.resources import add_airflow_resources
-
-logger = logging.getLogger(__name__)
+from airflow_mcp_server.server_safe import _serve_airflow
 
 
-async def serve(config: AirflowConfig, static_tools: bool = False, transport: Literal["stdio", "streamable-http", "sse"] = "stdio", **transport_kwargs) -> None:
-    """Start MCP server in unsafe mode (all operations).
+async def serve(
+    config: AirflowConfig,
+    static_tools: bool = False,
+    resources_dir: str | None = None,
+    transport: Literal["stdio", "streamable-http", "sse"] = "stdio",
+    **transport_kwargs,
+) -> None:
+    """Start MCP server in unsafe mode (read/write operations)."""
 
-    Args:
-        config: Configuration object with auth and URL settings
-        static_tools: If True, use static tools instead of hierarchical discovery
-        transport: Transport type ("stdio", "streamable-http", "sse")
-        **transport_kwargs: Additional transport configuration (port, host, etc.)
-    """
-    if not config.base_url:
-        raise ValueError("base_url is required")
-    if not config.auth_token:
-        raise ValueError("auth_token is required")
-
-    client = httpx.AsyncClient(base_url=config.base_url, headers={"Authorization": f"Bearer {config.auth_token}"}, timeout=30.0)
-
-    try:
-        response = await client.get("/openapi.json")
-        response.raise_for_status()
-        openapi_spec = response.json()
-    except Exception as e:
-        logger.error("Failed to fetch OpenAPI spec: %s", e)
-        await client.aclose()
-        raise
-
-    if static_tools:
-        route_maps = [RouteMap(methods=["GET", "POST", "PUT", "DELETE", "PATCH"], mcp_type=MCPType.TOOL)]
-        mcp = FastMCP.from_openapi(openapi_spec=openapi_spec, client=client, name="Airflow MCP Server (Unsafe Mode - Static Tools)", route_maps=route_maps)
-    else:
-        mcp = FastMCP("Airflow MCP Server (Unsafe Mode)")
-
-        _ = HierarchicalToolManager(
-            mcp=mcp,
-            openapi_spec=openapi_spec,
-            client=client,
-            allowed_methods={"GET", "POST", "PUT", "DELETE", "PATCH"},
-        )
-
-    add_airflow_resources(mcp, config, mode="unsafe")
-    add_airflow_prompts(mcp, mode="unsafe")
-
-    try:
-        if transport in ["streamable-http", "sse"]:
-            await mcp.run_async(transport=transport, **transport_kwargs)
-        else:
-            await mcp.run_async()
-    except Exception as e:
-        logger.error("Server error: %s", e)
-        await client.aclose()
-        raise
+    await _serve_airflow(
+        config=config,
+        allowed_methods={"GET", "POST", "PUT", "DELETE", "PATCH"},
+        mode_label="Unsafe Mode",
+        static_tools=static_tools,
+        resources_dir=resources_dir,
+        transport=transport,
+        transport_kwargs=transport_kwargs,
+    )

@@ -1,19 +1,32 @@
-"""Airflow-specific resources for MCP server."""
+"""Airflow-specific resource registration helpers."""
 
-import logging
+from __future__ import annotations
 
-from fastmcp import FastMCP
+from collections.abc import Callable
 
-from airflow_mcp_server.config import AirflowConfig
+from mcp import types
+from mcp.server.lowlevel import Server
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 
-logger = logging.getLogger(__name__)
+from airflow_mcp_server.knowledge_resources import load_knowledge_resources
 
 
-def add_airflow_resources(mcp: FastMCP, config: AirflowConfig, mode: str = "safe") -> None:
-    """Add Airflow-specific resources to the MCP server.
+def register_resources(server: Server, resources_dir: str | None) -> None:
+    resources = load_knowledge_resources(resources_dir)
+    resource_map: dict[str, tuple[str, Callable[[], str], str]] = {
+        uri: (title, reader, mime) for uri, title, reader, mime in resources
+    }
 
-    Args:
-        mcp: FastMCP server instance
-        config: Airflow configuration
-        mode: Server mode ("safe" or "unsafe")
-    """
+    @server.list_resources()
+    async def _list_resources(_: types.ListResourcesRequest | None = None) -> types.ListResourcesResult:
+        items = [types.Resource(uri=uri, name=title, mimeType=mime) for uri, (title, _reader, mime) in resource_map.items()]
+        return types.ListResourcesResult(resources=items)
+
+    @server.read_resource()
+    async def _read_resource(uri: str) -> list[ReadResourceContents]:
+        if uri not in resource_map:
+            raise ValueError(f"Unknown resource '{uri}'")
+
+        _title, reader, mime = resource_map[uri]
+        content = reader()
+        return [ReadResourceContents(content=str(content), mime_type=mime)]

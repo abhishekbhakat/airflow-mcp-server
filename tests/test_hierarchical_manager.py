@@ -1,27 +1,11 @@
 """Tests for HierarchicalToolManager."""
 
-from unittest.mock import Mock
+from types import SimpleNamespace
 
-import httpx
 import pytest
-from fastmcp import FastMCP
+from mcp import types
 
 from airflow_mcp_server.hierarchical_manager import HierarchicalToolManager
-
-
-@pytest.fixture
-def mock_client():
-    """Create mock HTTP client."""
-    client = Mock(spec=httpx.AsyncClient)
-    return client
-
-
-@pytest.fixture
-def mock_mcp():
-    """Create mock FastMCP instance."""
-    mcp = Mock(spec=FastMCP)
-    mcp.tool = Mock()
-    return mcp
 
 
 @pytest.fixture
@@ -32,61 +16,102 @@ def sample_openapi_spec():
         "info": {"title": "Airflow API", "version": "1.0.0"},
         "paths": {
             "/api/v1/dags": {
-                "get": {"operationId": "get_dags", "summary": "Get all DAGs", "tags": ["DAGs"], "responses": {"200": {"description": "Success"}}},
-                "post": {"operationId": "create_dag", "summary": "Create a DAG", "tags": ["DAGs"], "responses": {"201": {"description": "Created"}}},
+                "get": {
+                    "operationId": "get_dags",
+                    "summary": "Get all DAGs",
+                    "tags": ["DAGs"],
+                    "responses": {"200": {"description": "Success"}},
+                }
             },
-            "/api/v1/connections": {"get": {"operationId": "get_connections", "summary": "Get connections", "tags": ["Connections"], "responses": {"200": {"description": "Success"}}}},
+            "/api/v1/connections": {
+                "get": {
+                    "operationId": "get_connections",
+                    "summary": "Get connections",
+                    "tags": ["Connections"],
+                    "responses": {"200": {"description": "Success"}},
+                }
+            },
         },
     }
 
 
-def test_hierarchical_manager_init(mock_mcp, sample_openapi_spec, mock_client):
-    """Test HierarchicalToolManager initialization."""
-    manager = HierarchicalToolManager(mcp=mock_mcp, openapi_spec=sample_openapi_spec, client=mock_client, allowed_methods={"GET", "POST"})
+class FakeSession:
+    def __init__(self) -> None:
+        self.notifications = 0
 
-    assert manager.mcp == mock_mcp
-    assert manager.openapi_spec == sample_openapi_spec
-    assert manager.client == mock_client
-    assert manager.allowed_methods == {"GET", "POST"}
-    assert manager.current_mode == "categories"
-    assert isinstance(manager.current_tools, set)
+    async def send_tool_list_changed(self) -> None:
+        self.notifications += 1
 
 
-def test_hierarchical_manager_default_methods(mock_mcp, sample_openapi_spec, mock_client):
-    """Test HierarchicalToolManager with default allowed methods."""
-    manager = HierarchicalToolManager(mcp=mock_mcp, openapi_spec=sample_openapi_spec, client=mock_client)
+class FakeServer:
+    def __init__(self) -> None:
+        self.list_handlers = []
+        self.call_handlers = []
+        self._request_context = SimpleNamespace(session=FakeSession())
 
-    # Should default to all methods
-    assert manager.allowed_methods == {"GET", "POST", "PUT", "DELETE", "PATCH"}
+    def list_tools(self):
+        def decorator(func):
+            self.list_handlers.append(func)
+            return func
+
+        return decorator
+
+    def call_tool(self):
+        def decorator(func):
+            self.call_handlers.append(func)
+            return func
+
+        return decorator
+
+    @property
+    def request_context(self):
+        return self._request_context
 
 
-def test_hierarchical_manager_safe_mode(mock_mcp, sample_openapi_spec, mock_client):
-    """Test HierarchicalToolManager in safe mode (GET only)."""
-    manager = HierarchicalToolManager(mcp=mock_mcp, openapi_spec=sample_openapi_spec, client=mock_client, allowed_methods={"GET"})
+class FakeToolset:
+    def __init__(self) -> None:
+        self.tool = types.Tool(
+            name="get_dags",
+            description="Fetch DAGs",
+            inputSchema={"type": "object"},
+            outputSchema=None,
+        )
+        self.last_call: tuple[str, dict[str, str]] | None = None
 
-    assert manager.allowed_methods == {"GET"}
+    def list_tools(self):
+        return [self.tool]
+
+    def get_tool(self, name: str):
+        return self.tool, None
+
+    async def call_tool(self, name: str, arguments: dict[str, str]):
+        self.last_call = (name, arguments)
+        return [types.TextContent(type="text", text="ok")]
 
 
-def test_persistent_tools_constant():
-    """Test that persistent tools are defined correctly."""
-    expected_tools = {"browse_categories", "select_category", "get_current_category"}
-    assert HierarchicalToolManager.PERSISTENT_TOOLS == expected_tools
+@pytest.mark.asyncio
+async def test_hierarchical_manager_navigation(sample_openapi_spec):
+    server = FakeServer()
+    toolset = FakeToolset()
 
+    HierarchicalToolManager(server, toolset, sample_openapi_spec, {"GET"})
 
-def test_hierarchical_manager_attributes(mock_mcp, sample_openapi_spec, mock_client):
-    """Test that all required attributes are set."""
-    manager = HierarchicalToolManager(mcp=mock_mcp, openapi_spec=sample_openapi_spec, client=mock_client)
+    assert len(server.list_handlers) == 1
+    assert len(server.call_handlers) == 1
 
-    # Check all required attributes exist
-    assert hasattr(manager, "mcp")
-    assert hasattr(manager, "openapi_spec")
-    assert hasattr(manager, "client")
-    assert hasattr(manager, "allowed_methods")
-    assert hasattr(manager, "current_mode")
-    assert hasattr(manager, "current_tools")
-    assert hasattr(manager, "category_tool_instances")
+    list_handler = server.list_handlers[0]
+    call_handler = server.call_handlers[0]
 
-    # Check initial values
-    assert manager.current_mode == "categories"
-    assert isinstance(manager.current_tools, set)
-    assert isinstance(manager.category_tool_instances, dict)
+    result = await list_handler(None)
+    nav_names = {tool.name for tool in result.tools}
+    assert {"browse_categories", "select_category", "get_current_category", "back_to_categories"}.issubset(nav_names)
+
+    await call_handler("select_category", {"category": "DAGs"})
+    assert server.request_context.session.notifications == 1
+
+    result_after = await list_handler(None)
+    tool_names = {tool.name for tool in result_after.tools}
+    assert "get_dags" in tool_names
+
+    await call_handler("get_dags", {"foo": "bar"})
+    assert toolset.last_call == ("get_dags", {"foo": "bar"})

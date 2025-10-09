@@ -1,7 +1,11 @@
 class AirflowConfig:
     """Centralized configuration for Airflow MCP server."""
 
-    def __init__(self, base_url: str | None = None, auth_token: str | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        auth_token: str | None = None,
+    ) -> None:
         """Initialize configuration with provided values.
 
         Args:
