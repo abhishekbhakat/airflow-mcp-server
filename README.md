@@ -148,7 +148,7 @@ Point the server at a folder of Markdown guides whenever you want agents to refe
 airflow-mcp-server --base-url http://localhost:8080 --auth-token <jwt> --resources-dir ~/airflow-resources
 ```
 
-- Every top-level `.md`/`.markdown` file becomes a read-only resource (`resource://knowledge/<slug>`) visible in your MCP client.
+- Every top-level `.md`/`.markdown` file becomes a read-only resource (`file:///<slug>`) visible in your MCP client.
 - The first `# Heading` in each file (if present) is used as the resource title; otherwise the filename stem is used.
 - Set `AIRFLOW_MCP_RESOURCES_DIR=/path/to/docs` if you prefer environment-based configuration.
 - Update the files on disk and restart the server to refresh the resources list.

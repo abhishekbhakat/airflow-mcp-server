@@ -118,13 +118,13 @@ def load_knowledge_resources(resources_dir: str | None) -> list[tuple[str, str, 
     for markdown_file in _iter_markdown_files(root_resolved):
         relative_name = markdown_file.stem
         slug = _unique_slug(_slugify(relative_name), slugs)
-        uri = f"resource://knowledge/{slug}"
+        uri = f"file:///{slug}"
         title = _extract_title(markdown_file)
 
         display_title = title or relative_name.replace("_", " ").strip()
 
         discovered.append((uri, display_title, lambda p=markdown_file: _read_file(p), "text/markdown"))
-        logger.debug("Registered knowledge resource %s for %s", uri, markdown_file)
+        logger.debug("Registered resource %s for %s", uri, markdown_file)
 
     if not discovered:
         logger.info("Resources directory contained no Markdown files: %s", resources_dir)

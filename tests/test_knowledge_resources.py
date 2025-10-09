@@ -17,8 +17,8 @@ def test_registers_markdown_files(tmp_path: Path):
     resources = load_knowledge_resources(str(tmp_path))
     contents = _materialize(resources)
 
-    assert "resource://knowledge/guide" in contents
-    assert contents["resource://knowledge/guide"] == "# Title\nBody"
+    assert "file:///guide" in contents
+    assert contents["file:///guide"] == "# Title\nBody"
 
 
 def test_duplicate_names_get_unique_slugs(tmp_path: Path):
@@ -29,10 +29,10 @@ def test_duplicate_names_get_unique_slugs(tmp_path: Path):
     resources = load_knowledge_resources(str(tmp_path))
     contents = _materialize(resources)
 
-    assert "resource://knowledge/note" in contents
-    assert "resource://knowledge/note-2" in contents
-    assert contents["resource://knowledge/note"] == "first"
-    assert contents["resource://knowledge/note-2"] == "second"
+    assert "file:///note" in contents
+    assert "file:///note-2" in contents
+    assert contents["file:///note"] == "first"
+    assert contents["file:///note-2"] == "second"
 
 
 def test_missing_directory_logs_warning(caplog):
