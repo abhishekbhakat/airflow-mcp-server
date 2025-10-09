@@ -1,4 +1,4 @@
-# airflow-mcp-server: An MCP Server for controlling Airflow
+# airflow-mcp-server: An MCP Server for controlling Airflow 3
 
 mcp-name: io.github.abhishekbhakat/airflow-mcp-server
 
@@ -42,18 +42,8 @@ https://github.com/user-attachments/assets/f3e60fff-8680-4dd9-b08e-fa7db655a705
 }
 ```
 
-### Airflow 3 Plugin (Streamable HTTP at /mcp)
 
-Install the plugin alongside the server to mount an MCP endpoint directly in the Airflow webserver:
-
-```bash
-pip install "airflow-mcp-server[airflow-plugin]"
-```
-
-- Airflow auto-loads the plugin via entry point
-- Endpoint: `http(s)://<airflow-host>/mcp`
-- Stateless: every request must include `Authorization: Bearer <access-token>`
-- Modes (per-request): safe by default, or `?mode=unsafe` to enable write operations
+See [`CONFIG.md`](CONFIG.md) for IDE-specific configuration examples across popular MCP clients.
 
 #### HTTP Transport
 ```json
@@ -150,6 +140,19 @@ Options:
   --help             Show this message and exit.
 ```
 
+### Using Resources
+
+Point the server at a folder of Markdown guides whenever you want agents to reference local documentation:
+
+```bash
+airflow-mcp-server --base-url http://localhost:8080 --auth-token <jwt> --resources-dir ~/airflow-resources
+```
+
+- Every top-level `.md`/`.markdown` file becomes a read-only resource (`resource://knowledge/<slug>`) visible in your MCP client.
+- The first `# Heading` in each file (if present) is used as the resource title; otherwise the filename stem is used.
+- Set `AIRFLOW_MCP_RESOURCES_DIR=/path/to/docs` if you prefer environment-based configuration.
+- Update the files on disk and restart the server to refresh the resources list.
+
 ### Considerations
 
 **Authentication**
@@ -171,7 +174,9 @@ The default is 100 items, but you can change it using `maximum_page_limit` optio
 - [x] Airflow 3 readiness
 - [x] Parse OpenAPI Spec
 - [x] Safe/Unsafe mode implementation
-- [x] Parse proper description with list_tools.
+- [x] Parse proper description with list_tools
 - [x] Airflow config fetch (_specifically for page limit_)
 - [x] HTTP/SSE transport support
-- [ ] Env variables optional (_env variables might not be ideal for airflow plugins_)
+- [ ] ~~Env variables optional (_env variables might not be ideal for airflow plugins_)~~
+- [ ] Dynamic resources hosting via MCP Server
+- [ ] Sample resources and dags

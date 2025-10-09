@@ -115,6 +115,71 @@ def test_main_env_overrides_cli(runner):
                     mock_config.assert_called_once_with(base_url="http://env:8080", auth_token="env-token")
 
 
+def test_main_resources_dir_cli_option(runner):
+    """Ensure CLI resources directory is forwarded to the server."""
+    with patch("airflow_mcp_server.AirflowConfig") as mock_config:
+        with patch("airflow_mcp_server.serve_unsafe") as mock_serve:
+            with patch("asyncio.run"):
+                result = runner.invoke(
+                    main,
+                    [
+                        "--base-url",
+                        "http://localhost:8080",
+                        "--auth-token",
+                        "token",
+                        "--resources-dir",
+                        "/tmp/resources",
+                    ],
+                )
+
+                assert result.exit_code == 0
+                mock_config.assert_called_once_with(base_url="http://localhost:8080", auth_token="token")
+                assert mock_serve.call_args[1]["resources_dir"] == "/tmp/resources"
+
+
+def test_main_resources_dir_env_var(runner):
+    """Ensure environment resources directory is used when CLI option absent."""
+    env_vars = {"AIRFLOW_MCP_RESOURCES_DIR": "/env/docs"}
+
+    with patch.dict(os.environ, env_vars):
+        with patch("airflow_mcp_server.AirflowConfig") as mock_config:
+            with patch("airflow_mcp_server.serve_unsafe") as mock_serve:
+                with patch("asyncio.run"):
+                    result = runner.invoke(
+                        main,
+                        ["--base-url", "http://localhost:8080", "--auth-token", "token"],
+                    )
+
+                    assert result.exit_code == 0
+                    mock_config.assert_called_once_with(base_url="http://localhost:8080", auth_token="token")
+                    assert mock_serve.call_args[1]["resources_dir"] == "/env/docs"
+
+
+def test_main_resources_dir_cli_precedence(runner):
+    """CLI resources directory should override environment variable."""
+    env_vars = {"AIRFLOW_MCP_RESOURCES_DIR": "/env/docs"}
+
+    with patch.dict(os.environ, env_vars):
+        with patch("airflow_mcp_server.AirflowConfig") as mock_config:
+            with patch("airflow_mcp_server.serve_unsafe") as mock_serve:
+                with patch("asyncio.run"):
+                    result = runner.invoke(
+                        main,
+                        [
+                            "--base-url",
+                            "http://localhost:8080",
+                            "--auth-token",
+                            "token",
+                            "--resources-dir",
+                            "/cli/docs",
+                        ],
+                    )
+
+                    assert result.exit_code == 0
+                    mock_config.assert_called_once_with(base_url="http://localhost:8080", auth_token="token")
+                    assert mock_serve.call_args[1]["resources_dir"] == "/cli/docs"
+
+
 def test_main_verbose_logging(runner):
     """Test verbose logging options."""
     with patch("airflow_mcp_server.serve_unsafe"):
@@ -226,10 +291,10 @@ def test_main_custom_host_port(runner):
     with patch("airflow_mcp_server.serve_unsafe") as mock_serve:
         mock_serve.return_value = None
         with patch("asyncio.run"):
-            result = runner.invoke(main, ["--http", "--port", "8000", "--host", "0.0.0.0", "--base-url", "http://localhost:8080", "--auth-token", "test-token"])
+            result = runner.invoke(main, ["--http", "--port", "8080", "--host", "0.0.0.0", "--base-url", "http://localhost:8080", "--auth-token", "test-token"])
 
             assert result.exit_code == 0
 
             call_args = mock_serve.call_args
-            assert call_args[1]["port"] == 8000
+            assert call_args[1]["port"] == 8080
             assert call_args[1]["host"] == "0.0.0.0"

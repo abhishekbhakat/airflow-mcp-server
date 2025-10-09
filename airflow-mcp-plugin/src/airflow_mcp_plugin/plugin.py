@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
-import httpx
-from airflow.plugins_manager import AirflowPlugin
-from fastmcp.experimental.server.openapi import (
-    FastMCPOpenAPI,
-    MCPType,
-    RouteMap,
-)
-from starlette.applications import Starlette
+import aiohttp
+import anyio
+from airflow.plugins_manager import AirflowPlugin  # type: ignore[import-not-found]
+from mcp import types
+from mcp.server.lowlevel import Server
+from mcp.server.streamable_http import StreamableHTTPServerTransport
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
+
+from airflow_mcp_plugin.toolset import AirflowOpenAPIToolset
 
 logger = logging.getLogger(__name__)
 
@@ -36,20 +37,12 @@ def _compute_airflow_prefix(request: Request) -> str:
 
 
 class StatelessMCPMount:
-    """FastAPI-compatible object that creates a stateless MCP server.
-
-    Every request must include Authorization: Bearer <token>.
-    The token is forwarded to Airflow APIs for that specific request.
-    Uses static tools (no hierarchical discovery) and stateless HTTP.
-    """
-
-    def __init__(self, path: str = "/mcp") -> None:
-        self._path = path
-        self._openapi_spec: dict | None = None
+    def __init__(self) -> None:
+        self._openapi_spec: dict[str, Any] | None = None
         self._spec_lock = asyncio.Lock()
+        self._toolsets: dict[bool, AirflowOpenAPIToolset] = {}
 
-    async def _ensure_openapi_spec(self, base_url: str, token: str) -> dict | None:
-        """Fetch OpenAPI spec once and cache it."""
+    async def _ensure_openapi_spec(self, base_url: str, token: str) -> dict[str, Any] | None:
         if self._openapi_spec is not None:
             return self._openapi_spec
 
@@ -57,107 +50,86 @@ class StatelessMCPMount:
             if self._openapi_spec is not None:
                 return self._openapi_spec
 
-            client = httpx.AsyncClient(
-                base_url=base_url,
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=30.0,
-            )
+            timeout = aiohttp.ClientTimeout(total=30)
+            headers = {"Authorization": f"Bearer {token}"}
             try:
-                resp = await client.get("openapi.json")
-                resp.raise_for_status()
-                self._openapi_spec = resp.json()
-                return self._openapi_spec
-            except Exception as e:
-                logger.error(f"Failed to fetch OpenAPI spec: {e}")
+                async with aiohttp.ClientSession(base_url=base_url, headers=headers, timeout=timeout) as session:
+                    async with session.get("openapi.json") as response:
+                        response.raise_for_status()
+                        self._openapi_spec = await response.json()
+                        return self._openapi_spec
+            except Exception as exc:
+                logger.error("Failed to fetch OpenAPI spec: %s", exc)
                 return None
-            finally:
-                await client.aclose()
 
-    async def _build_stateless_app(self, request: Request) -> Starlette:
-        """Build a stateless MCP app that forwards the current request's auth token."""
+    def _get_toolset(self, spec: dict[str, Any], allow_mutations: bool) -> AirflowOpenAPIToolset:
+        key = allow_mutations
+        if key not in self._toolsets:
+            self._toolsets[key] = AirflowOpenAPIToolset(spec, allow_mutations)
+        return self._toolsets[key]
+
+    def _build_server(self, toolset: AirflowOpenAPIToolset, base_url: str, token: str) -> Server:
+        server = Server(name="Airflow MCP Plugin", version="0.2.0")
+
+        @server.list_tools()
+        async def _list_tools(_: types.ListToolsRequest | None = None):
+            return toolset.list_tools()
+
+        @server.call_tool()
+        async def _call_tool(tool_name: str, arguments: dict[str, Any]):
+            return await toolset.call_tool(tool_name, arguments or {}, base_url, token)
+
+        return server
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("path") in {None, ""}:
+            scope = dict(scope)
+            scope["path"] = "/"
+
+        request = Request(scope, receive=receive)
+
         auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
         if not auth_header or not auth_header.lower().startswith("bearer "):
-            async def auth_error(_req: Request) -> Response:
-                return JSONResponse({"error": "Authorization Bearer token required"}, status_code=401)
-            return Starlette(routes=[], exception_handlers={Exception: auth_error})
+            response = JSONResponse({"error": "Authorization Bearer token required"}, status_code=401)
+            await response(scope, receive, send)
+            return
 
         token = auth_header.split(" ", 1)[1].strip()
         mode_param = (request.query_params.get("mode") or "safe").lower()
-        is_unsafe = mode_param == "unsafe"
+        allow_mutations = mode_param == "unsafe"
 
         url = request.url
         airflow_prefix = _compute_airflow_prefix(request)
         base_url = f"{url.scheme}://{url.netloc}{airflow_prefix}"
 
-        openapi_spec = await self._ensure_openapi_spec(base_url, token)
-        if openapi_spec is None:
-            async def spec_error(_req: Request) -> Response:
-                return JSONResponse({"error": "Failed to fetch Airflow OpenAPI spec"}, status_code=502)
-            return Starlette(routes=[], exception_handlers={Exception: spec_error})
+        spec = await self._ensure_openapi_spec(base_url, token)
+        if spec is None:
+            response = JSONResponse({"error": "Failed to fetch Airflow OpenAPI spec"}, status_code=502)
+            await response(scope, receive, send)
+            return
 
-        client = httpx.AsyncClient(
-            base_url=base_url,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=30.0,
-        )
+        toolset = self._get_toolset(spec, allow_mutations)
+        server = self._build_server(toolset, base_url, token)
+        transport = StreamableHTTPServerTransport(mcp_session_id=None)
+        initialization = server.create_initialization_options()
 
-        server_name = "Airflow MCP Server (Unsafe Mode)" if is_unsafe else "Airflow MCP Server (Safe Mode)"
-        allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"] if is_unsafe else ["GET"]
-
-        # Pre-filter OpenAPI operations so Safe mode only exposes GET endpoints
-        if not is_unsafe:
-            paths = openapi_spec.get("paths", {})
-            filtered_paths: dict[str, dict] = {}
-            for path, path_item in paths.items():
-                new_item: dict[str, dict] = {}
-                for method, operation in path_item.items():
-                    lower_method = method.lower()
-                    if lower_method in {"get", "post", "put", "delete", "patch"}:
-                        if method.upper() in allowed_methods:
-                            new_item[lower_method] = operation
-                    # keep non-operation keys only if there will be operations
-                if new_item:
-                    # preserve common keys like parameters if present
-                    if isinstance(path_item, dict) and "parameters" in path_item:
-                        new_item["parameters"] = path_item["parameters"]
-                    filtered_paths[path] = new_item
-            openapi_spec = {**openapi_spec, "paths": filtered_paths}
-        route_maps = [RouteMap(methods=allowed_methods, mcp_type=MCPType.TOOL)]
-        mcp = FastMCPOpenAPI(
-            openapi_spec=openapi_spec,
-            client=client,
-            name=server_name,
-            route_maps=route_maps,
-        )
-
-        mcp_app = mcp.http_app(path=self._path, stateless_http=True)
-
-        return mcp_app
-
-    async def __call__(self, scope, receive, send):
-        # Normalize empty subpath from parent mount (e.g., '/mcp' -> '/')
-        if not scope.get("path"):
-            scope = dict(scope)
-            scope["path"] = "/"
-
-        request = Request(scope, receive=receive)
-        app = await self._build_stateless_app(request)
-        # Ensure FastMCP's lifespan runs for each request since the parent app won't manage it
-        if hasattr(app, "router") and hasattr(app.router, "lifespan_context"):
-            async with app.router.lifespan_context(app):
-                await app(scope, receive, send)
-        else:
-            await app(scope, receive, send)
+        async with transport.connect() as (read_stream, write_stream):
+            async with anyio.create_task_group() as task_group:
+                task_group.start_soon(
+                    server.run,
+                    read_stream,
+                    write_stream,
+                    initialization,
+                    False,
+                    True,
+                )
+                try:
+                    await transport.handle_request(scope, receive, send)
+                finally:
+                    task_group.cancel_scope.cancel()
 
 
 class AirflowMCPPlugin(AirflowPlugin):
     name = "airflow_mcp_plugin"
 
-    def on_load(self, *args, **kwargs):
-        pass
-
-    @property
-    def fastapi_apps(self):
-        # Mount our ASGI app under /mcp so we don't intercept core Airflow routes
-        stateless = StatelessMCPMount(path="/")
-        return [{"app": stateless, "url_prefix": "/mcp", "name": "Airflow MCP"}]
+    fastapi_apps = [{"app": StatelessMCPMount(), "url_prefix": "/mcp", "name": "Airflow MCP"}]

@@ -1,13 +1,13 @@
 """Airflow-specific prompts for MCP server."""
 
-from fastmcp import FastMCP
+from mcp.server.lowlevel import Server
 
 
-def add_airflow_prompts(mcp: FastMCP, mode: str = "safe") -> None:
+def add_airflow_prompts(_server: Server, mode: str = "safe") -> None:  # pragma: no cover - placeholder
     """Add Airflow-specific prompts to the MCP server.
 
     Args:
-        mcp: FastMCP server instance
+        _server: MCP server instance
         mode: Server mode ("safe" or "unsafe")
     """
     pass
