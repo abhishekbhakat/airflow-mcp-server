@@ -1,3 +1,5 @@
+# Project Diagram
+
 ```mermaid
 ---
 config:
@@ -28,3 +30,5 @@ flowchart TD
     linkStyle 11 stroke:orange,stroke-width:2px,fill:none
     linkStyle 12 stroke:orange,stroke-width:2px,fill:none
 ```
+
+![Project Diagram](Diagram.png)
