@@ -1,8 +1,7 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.abhishekbhakat/airflow-mcp-server",
   "description": "An MCP server for Apache Airflow ",
-  "status": "active",
   "repository": {
     "url": "https://github.com/abhishekbhakat/airflow-mcp-server",
     "source": "github"
@@ -10,30 +9,30 @@
   "version": "0.9.0",
   "packages": [
     {
-      "registry_type": "pypi",
-      "registry_base_url": "https://pypi.org",
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
       "identifier": "airflow-mcp-server",
       "version": "0.9.0",
       "transport": {
         "type": "stdio"
       },
-      "environment_variables": [
+      "environmentVariables": [
         {
           "description": "The base URL for the Airflow API (e.g., http://localhost:8080)",
-          "is_required": true,
+          "isRequired": true,
           "format": "string",
-          "is_secret": false,
+          "isSecret": false,
           "name": "AIRFLOW_BASE_URL"
         },
         {
           "description": "The JWT authentication token for Airflow API access",
-          "is_required": true,
+          "isRequired": true,
           "format": "string",
-          "is_secret": true,
+          "isSecret": true,
           "name": "AUTH_TOKEN"
         }
       ],
-      "package_arguments": [
+      "packageArguments": [
         {
           "type": "named",
           "name": "--safe",
@@ -47,31 +46,31 @@
       ]
     },
     {
-      "registry_type": "pypi",
-      "registry_base_url": "https://pypi.org",
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
       "identifier": "airflow-mcp-server",
       "version": "0.8.2",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:3000"
       },
-      "environment_variables": [
+      "environmentVariables": [
         {
           "description": "The base URL for the Airflow API (e.g., http://localhost:8080)",
-          "is_required": true,
+          "isRequired": true,
           "format": "string",
-          "is_secret": false,
+          "isSecret": false,
           "name": "AIRFLOW_BASE_URL"
         },
         {
           "description": "The JWT authentication token for Airflow API access",
-          "is_required": true,
+          "isRequired": true,
           "format": "string",
-          "is_secret": true,
+          "isSecret": true,
           "name": "AUTH_TOKEN"
         }
       ],
-      "package_arguments": [
+      "packageArguments": [
         {
           "type": "named",
           "name": "--http",
