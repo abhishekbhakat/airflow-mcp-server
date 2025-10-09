@@ -28,7 +28,9 @@ async def test_safe_server_delegates_to_runtime(mock_config):
         await server_safe.serve(mock_config, static_tools=True, transport="stdio", resources_dir="/tmp/resources")
 
     runtime_mock.assert_awaited_once()
-    kwargs = runtime_mock.await_args.kwargs
+    await_args = runtime_mock.await_args
+    assert await_args is not None
+    kwargs = await_args.kwargs
     assert kwargs["allowed_methods"] == {"GET"}
     assert kwargs["static_tools"] is True
     assert kwargs["resources_dir"] == "/tmp/resources"
@@ -41,7 +43,9 @@ async def test_unsafe_server_delegates_to_runtime(mock_config):
         await server_unsafe.serve(mock_config, static_tools=False, transport="streamable-http")
 
     runtime_mock.assert_awaited_once()
-    kwargs = runtime_mock.await_args.kwargs
+    await_args = runtime_mock.await_args
+    assert await_args is not None
+    kwargs = await_args.kwargs
     assert kwargs["allowed_methods"] == {"GET", "POST", "PUT", "DELETE", "PATCH"}
     assert kwargs["transport"] == "streamable-http"
 

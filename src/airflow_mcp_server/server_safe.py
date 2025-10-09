@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal
+from contextlib import asynccontextmanager
+from typing import Any, Literal, cast
 
 import aiohttp
 import uvicorn
@@ -85,8 +86,14 @@ async def _serve_airflow(
 
         initialization = server.create_initialization_options()
 
-        host = transport_kwargs.get("host", "localhost")
-        port = transport_kwargs.get("port", 3000)
+        host_value = transport_kwargs.get("host", "localhost")
+        host = cast(str, host_value) if isinstance(host_value, str) else "localhost"
+
+        port_value = transport_kwargs.get("port", 3000)
+        if isinstance(port_value, (int, str)):
+            port = int(port_value)
+        else:
+            raise TypeError("port must be an int or string")
 
         if transport == "stdio":
             await _run_stdio(server, initialization)
@@ -127,10 +134,11 @@ async def _run_streamable_http(server: Server, *, host: str, port: int) -> None:
         def __init__(self, manager: StreamableHTTPSessionManager) -> None:
             self._manager = manager
 
-        async def __call__(self, scope, receive, send):
+        async def __call__(self, scope: Any, receive: Any, send: Any):
             await self._manager.handle_request(scope, receive, send)
 
-    async def lifespan(app):  # type: ignore[unused-argument]
+    @asynccontextmanager
+    async def lifespan(_: Starlette):
         async with session_manager.run():
             yield
 
@@ -152,7 +160,7 @@ async def _run_streamable_http(server: Server, *, host: str, port: int) -> None:
 async def _run_sse(server: Server, initialization: InitializationOptions, *, host: str, port: int) -> None:
     transport = SseServerTransport("/messages")
 
-    async def sse(scope, receive, send):
+    async def sse(scope: Any, receive: Any, send: Any):
         async with transport.connect_sse(scope, receive, send) as (read_stream, write_stream):
             await server.run(read_stream, write_stream, initialization, stateless=True)
         return Response(status_code=204)

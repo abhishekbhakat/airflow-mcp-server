@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from mcp import types
 from mcp.server.lowlevel import Server
@@ -101,6 +102,13 @@ class HierarchicalToolManager:
         }
 
     def _register_handlers(self) -> None:
+        navigation_handlers: dict[str, Callable[[dict[str, Any]], Awaitable[list[types.TextContent]]]] = {
+            "browse_categories": self._handle_browse,
+            "select_category": self._handle_select,
+            "get_current_category": self._handle_get_current,
+            "back_to_categories": self._handle_reset,
+        }
+
         @self._server.list_tools()
         async def _list_tools(_: types.ListToolsRequest | None = None) -> types.ListToolsResult:
             session_state = self._ensure_session_state()
@@ -110,7 +118,7 @@ class HierarchicalToolManager:
             if selected and selected in self._category_tool_names:
                 for name in self._category_tool_names[selected]:
                     try:
-                        tool, _ = self._toolset.get_tool(name)
+                        tool, _details = self._toolset.get_tool(name)
                         tools.append(tool)
                     except ValueError:
                         logger.debug("Tool %s not found when listing category %s", name, selected)
@@ -119,40 +127,43 @@ class HierarchicalToolManager:
 
         @self._server.call_tool()
         async def _call_tool(tool_name: str, arguments: dict[str, Any]):
-            if tool_name == "browse_categories":
-                info = get_category_info(self._categories)
-                return [types.TextContent(type="text", text=info)]
+            handler = navigation_handlers.get(tool_name)
+            if handler:
+                return await handler(arguments or {})
 
-            if tool_name == "select_category":
-                category = (arguments or {}).get("category")
-                if not category:
-                    return [types.TextContent(type="text", text="Missing required argument 'category'")]
-                message = await self._select_category(str(category))
-                return [types.TextContent(type="text", text=message)]
-
-            if tool_name == "get_current_category":
-                session_state = self._ensure_session_state()
-                selected = session_state["category"]
-                if selected and selected in self._categories:
-                    summary = get_category_tools_info(selected, self._categories[selected])
-                    return [types.TextContent(type="text", text=summary)]
-                return [types.TextContent(type="text", text="No category selected. Use browse_categories() to explore.")]
-
-            if tool_name == "back_to_categories":
-                message = await self._reset_category()
-                return [types.TextContent(type="text", text=message)]
-
-            # Fall back to actual API tools
             try:
                 return await self._toolset.call_tool(tool_name, arguments or {})
             except ValueError as exc:
                 return [types.TextContent(type="text", text=str(exc))]
 
+    async def _handle_browse(self, _: dict[str, Any]) -> list[types.TextContent]:
+        info = get_category_info(self._categories)
+        return [types.TextContent(type="text", text=info)]
+
+    async def _handle_select(self, arguments: dict[str, Any]) -> list[types.TextContent]:
+        category = arguments.get("category")
+        if not category:
+            return [types.TextContent(type="text", text="Missing required argument 'category'")]
+        message = await self._select_category(str(category))
+        return [types.TextContent(type="text", text=message)]
+
+    async def _handle_get_current(self, _: dict[str, Any]) -> list[types.TextContent]:
+        session_state = self._ensure_session_state()
+        selected = session_state["category"]
+        if selected and selected in self._categories:
+            summary = get_category_tools_info(selected, self._categories[selected])
+            return [types.TextContent(type="text", text=summary)]
+        return [types.TextContent(type="text", text="No category selected. Use browse_categories() to explore.")]
+
+    async def _handle_reset(self, _: dict[str, Any]) -> list[types.TextContent]:
+        message = await self._reset_category()
+        return [types.TextContent(type="text", text=message)]
+
     def _ensure_session_state(self) -> dict[str, str | None]:
         session = self._server.request_context.session
-        state = getattr(session, self._session_state_attr, None)
+        state = cast(dict[str, str | None] | None, getattr(session, self._session_state_attr, None))
         if state is None:
-            state = {"category": None}
+            state = {"category": cast(str | None, None)}
             setattr(session, self._session_state_attr, state)
         return state
 

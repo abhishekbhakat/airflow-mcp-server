@@ -1,11 +1,14 @@
 """Tests for HierarchicalToolManager."""
 
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from mcp import types
+from mcp.server.lowlevel import Server
 
 from airflow_mcp_server.hierarchical_manager import HierarchicalToolManager
+from airflow_mcp_server.toolset import AirflowOpenAPIToolset
 
 
 @pytest.fixture
@@ -94,7 +97,7 @@ async def test_hierarchical_manager_navigation(sample_openapi_spec):
     server = FakeServer()
     toolset = FakeToolset()
 
-    HierarchicalToolManager(server, toolset, sample_openapi_spec, {"GET"})
+    HierarchicalToolManager(cast(Server, server), cast(AirflowOpenAPIToolset, toolset), sample_openapi_spec, {"GET"})
 
     assert len(server.list_handlers) == 1
     assert len(server.call_handlers) == 1
