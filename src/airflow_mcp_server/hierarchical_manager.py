@@ -50,6 +50,7 @@ class HierarchicalToolManager:
             category: [get_tool_name_from_route(route) for route in routes]
             for category, routes in categories.items()
         }
+        self._default_category = "DAG" if "DAG" in self._categories else None
 
         self._navigation_tools = self._build_navigation_tools()
         self._register_handlers()
@@ -163,7 +164,7 @@ class HierarchicalToolManager:
         session = self._server.request_context.session
         state = cast(dict[str, str | None] | None, getattr(session, self._session_state_attr, None))
         if state is None:
-            state = {"category": cast(str | None, None)}
+            state = {"category": self._default_category}
             setattr(session, self._session_state_attr, state)
         return state
 

@@ -22,7 +22,7 @@ def sample_openapi_spec():
                 "get": {
                     "operationId": "get_dags",
                     "summary": "Get all DAGs",
-                    "tags": ["DAGs"],
+                    "tags": ["DAG"],
                     "responses": {"200": {"description": "Success"}},
                 }
             },
@@ -38,9 +38,28 @@ def sample_openapi_spec():
     }
 
 
+@pytest.fixture
+def spec_without_dag():
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": "Airflow API", "version": "1.0.0"},
+        "paths": {
+            "/api/v1/connections": {
+                "get": {
+                    "operationId": "get_connections",
+                    "summary": "Get connections",
+                    "tags": ["Connection"],
+                    "responses": {"200": {"description": "Success"}},
+                }
+            }
+        },
+    }
+
+
 class FakeSession:
     def __init__(self) -> None:
         self.notifications = 0
+        self._airflow_category_state = None
 
     async def send_tool_list_changed(self) -> None:
         self.notifications += 1
@@ -109,7 +128,7 @@ async def test_hierarchical_manager_navigation(sample_openapi_spec):
     nav_names = {tool.name for tool in result.tools}
     assert {"browse_categories", "select_category", "get_current_category", "back_to_categories"}.issubset(nav_names)
 
-    await call_handler("select_category", {"category": "DAGs"})
+    await call_handler("select_category", {"category": "DAG"})
     assert server.request_context.session.notifications == 1
 
     result_after = await list_handler(None)
@@ -118,3 +137,39 @@ async def test_hierarchical_manager_navigation(sample_openapi_spec):
 
     await call_handler("get_dags", {"foo": "bar"})
     assert toolset.last_call == ("get_dags", {"foo": "bar"})
+
+
+@pytest.mark.asyncio
+async def test_default_category_selected_on_first_list(sample_openapi_spec):
+    server = FakeServer()
+    toolset = FakeToolset()
+
+    HierarchicalToolManager(cast(Server, server), cast(AirflowOpenAPIToolset, toolset), sample_openapi_spec, {"GET"})
+
+    list_handler = server.list_handlers[0]
+    result = await list_handler(None)
+
+    tool_names = {tool.name for tool in result.tools}
+    assert "get_dags" in tool_names
+
+    state = server.request_context.session._airflow_category_state
+    assert state is not None
+    assert state["category"] == "DAG"
+
+
+@pytest.mark.asyncio
+async def test_default_category_not_set_when_missing(spec_without_dag):
+    server = FakeServer()
+    toolset = FakeToolset()
+
+    HierarchicalToolManager(cast(Server, server), cast(AirflowOpenAPIToolset, toolset), spec_without_dag, {"GET"})
+
+    list_handler = server.list_handlers[0]
+    result = await list_handler(None)
+
+    tool_names = {tool.name for tool in result.tools}
+    assert "get_dags" not in tool_names
+
+    state = server.request_context.session._airflow_category_state
+    assert state is not None
+    assert state["category"] is None
