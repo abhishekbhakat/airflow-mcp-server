@@ -16,11 +16,12 @@ It's designed for development and testing purposes in a trusted environment.
 - Execution errors will fail the task with full output
 """
 
-from airflow.sdk import dag
-from airflow.operators.bash import BashOperator
-from airflow.models.param import Param
-from pendulum import datetime
 from datetime import timedelta
+
+from airflow.models.param import Param
+from airflow.operators.bash import BashOperator
+from airflow.sdk import dag
+from pendulum import datetime
 
 
 @dag(

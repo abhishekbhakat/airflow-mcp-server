@@ -14,14 +14,11 @@ gpt-5-nano model. Requires the `OPENAI_API_KEY` Airflow Variable to be set.
 
 from __future__ import annotations
 
-import os
-
 from airflow.models import Variable
 from airflow.models.param import Param
 from airflow.operators.python import PythonVirtualenvOperator
 from airflow.sdk import dag
 from pendulum import datetime
-
 
 OPENAI_API_KEY = Variable.get("OPENAI_API_KEY")
 
@@ -79,4 +76,3 @@ def web_search_dag() -> None:
 
 
 web_search_dag()
-

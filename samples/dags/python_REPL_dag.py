@@ -15,13 +15,13 @@ It's designed for development and testing purposes in a trusted environment.
 - Execution errors will fail the task with full traceback
 """
 
-from airflow.sdk import dag, task
-from airflow.models.param import Param
-from pendulum import datetime
 import io
-import sys
-from contextlib import redirect_stdout, redirect_stderr
 import signal
+from contextlib import redirect_stderr, redirect_stdout
+
+from airflow.models.param import Param
+from airflow.sdk import dag, task
+from pendulum import datetime
 
 
 class TimeoutError(Exception):
@@ -67,26 +67,26 @@ def python_REPL_dag():
     def execute_code(**context):
         """
         Execute the provided Python code with stdout/stderr capture.
-        
+
         The code runs in an isolated namespace with timeout protection.
         All output is logged to Airflow task logs.
         """
         # Get parameters
         python_code = context["params"]["python_code"]
         timeout_seconds = context["params"]["timeout"]
-        
-        print(f"{'='*60}")
+
+        print(f"{'=' * 60}")
         print(f"Executing Python code with {timeout_seconds}s timeout")
-        print(f"{'='*60}\n")
-        
+        print(f"{'=' * 60}\n")
+
         # Prepare output capture
         stdout_capture = io.StringIO()
         stderr_capture = io.StringIO()
-        
+
         # Set up timeout
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(timeout_seconds)
-        
+
         try:
             # Execute code with output capture
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
@@ -95,68 +95,68 @@ def python_REPL_dag():
                     "__builtins__": __builtins__,
                     "__name__": "__main__",
                 }
-                
+
                 # Execute the code
                 exec(python_code, exec_namespace)
-            
+
             # Cancel timeout
             signal.alarm(0)
-            
+
             # Get captured output
             stdout_output = stdout_capture.getvalue()
             stderr_output = stderr_capture.getvalue()
-            
+
             # Log results
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("EXECUTION COMPLETED SUCCESSFULLY")
-            print(f"{'='*60}\n")
-            
+            print(f"{'=' * 60}\n")
+
             if stdout_output:
                 print("📤 STDOUT:")
                 print(stdout_output)
             else:
                 print("📤 STDOUT: (empty)")
-            
+
             if stderr_output:
                 print("\n⚠️  STDERR:")
                 print(stderr_output)
-            
-            print(f"\n{'='*60}")
+
+            print(f"\n{'=' * 60}")
             print(f"✅ Execution finished in less than {timeout_seconds}s")
-            print(f"{'='*60}")
-            
+            print(f"{'=' * 60}")
+
         except TimeoutError as e:
             signal.alarm(0)  # Cancel alarm
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"❌ TIMEOUT ERROR: {str(e)}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             raise
-            
-        except Exception as e:
+
+        except Exception:
             signal.alarm(0)  # Cancel alarm
-            
+
             # Get any output that was captured before the error
             stdout_output = stdout_capture.getvalue()
             stderr_output = stderr_capture.getvalue()
-            
-            print(f"\n{'='*60}")
+
+            print(f"\n{'=' * 60}")
             print("❌ EXECUTION FAILED")
-            print(f"{'='*60}\n")
-            
+            print(f"{'=' * 60}\n")
+
             if stdout_output:
                 print("📤 STDOUT (before error):")
                 print(stdout_output)
-            
+
             if stderr_output:
                 print("\n⚠️  STDERR (before error):")
                 print(stderr_output)
-            
-            print(f"\n{'='*60}")
+
+            print(f"\n{'=' * 60}")
             print("💥 EXCEPTION DETAILS:")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
             # Re-raise to show full traceback in Airflow logs
             raise
-        
+
         finally:
             stdout_capture.close()
             stderr_capture.close()
