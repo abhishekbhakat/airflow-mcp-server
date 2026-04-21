@@ -1,0 +1,48 @@
+policy:
+  approval:
+    - or:
+      - FORCE_COMMIT
+      - and:
+        - cloud_automation_review
+        - peer_review
+
+approval_rules:
+  # rule to allow for forcible commits regardless of regular review process
+  # this should be only used in the event of a site-outage and oncall is responding.
+  - name: FORCE_COMMIT
+    requires:
+      count: 1
+      # only some users are allowed to give this sort of commit
+      teams: ["ContextLogic/org_infra_pe_core-cloud", "ContextLogic/org_infra_pe_sre_ft"]
+    options:
+      allow_author: true
+      allow_contributor: true
+      methods:
+        comments:
+          - FORCE_COMMIT
+
+  # Enforce cloud_automation review on gitlab/policy-bot files
+  - name: cloud_automation_review
+    if:
+      changed_files:
+        paths:
+          - ".gitlab-ci.yml"
+          - ".policy.yml"
+    requires:
+      count: 1
+      teams: ["ContextLogic/org_infra_pe_core-cloud"]
+    options:
+      invalidate_on_push: true
+      methods:
+        github_review: true
+
+  # All files should require at least peer review
+  - name: peer_review
+    requires:
+      count: 1
+      organizations: ["ContextLogic"]
+    options:
+      invalidate_on_push: true
+      methods:
+        github_review: true
+
