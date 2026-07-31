@@ -10,6 +10,23 @@ from mcp import types
 from airflow_mcp_plugin.openapi_parser import OperationDetails, OperationParser
 
 
+def _mask_secrets(obj: Any) -> Any:
+    """Mask sensitive values in nested structures for safe mode."""
+    sensitive_keywords = ("password", "secret", "token", "fernet", "conn", "credential", "passphrase", "private_key")
+    if isinstance(obj, dict):
+        masked = {}
+        for k, v in obj.items():
+            k_lower = k.lower()
+            if any(kw in k_lower for kw in sensitive_keywords):
+                masked[k] = "****"
+            else:
+                masked[k] = _mask_secrets(v)
+        return masked
+    elif isinstance(obj, list):
+        return [_mask_secrets(item) for item in obj]
+    return obj
+
+
 @dataclass
 class PreparedRequest:
     path: str
@@ -138,6 +155,8 @@ class AirflowOpenAPIToolset:
                     else:
                         parsed = {}
 
+                    if not self._allow_mutations:
+                        parsed = _mask_secrets(parsed)
                     return ([], parsed)
 
                 text = body.decode("utf-8", errors="replace")
